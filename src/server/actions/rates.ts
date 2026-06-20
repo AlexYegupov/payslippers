@@ -4,6 +4,7 @@ import { db } from "@/server/db";
 import * as schema from "@/server/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { createRateEditSchema } from "@/server/db/schema";
 
 export interface RateWithCategory {
   category: {
@@ -25,7 +26,7 @@ export interface RateWithCategory {
 
 export async function getRatesForEmployee(
   employeeId: number,
-  effectiveDate: string
+  effectiveDate: string,
 ): Promise<RateWithCategory[]> {
   try {
     // Get all payment categories
@@ -41,25 +42,25 @@ export async function getRatesForEmployee(
           .where(
             and(
               eq(schema.rateEdits.employeeId, employeeId),
-              eq(schema.rateEdits.paymentCategoryId, category.id)
-            )
+              eq(schema.rateEdits.paymentCategoryId, category.id),
+            ),
           )
           .orderBy(
             desc(schema.rateEdits.effectiveDate),
             desc(schema.rateEdits.createdAt),
-            desc(schema.rateEdits.id)
+            desc(schema.rateEdits.id),
           );
 
         // Find the most recent rate edit that is effective as of the selected date
         const activeRate = allRateEdits.find(
-          (rate) => rate.effectiveDate <= effectiveDate
+          (rate) => rate.effectiveDate <= effectiveDate,
         );
 
         return {
           category,
           rate: activeRate || null,
         };
-      })
+      }),
     );
 
     return rates;
@@ -67,4 +68,50 @@ export async function getRatesForEmployee(
     console.error("Error fetching rates:", error);
     throw new Error("Failed to fetch rates");
   }
+}
+
+/**
+ * Create a new rate edit (rate event) for an employee and payment category.
+ * The effective date determines from when the rate applies.
+ */
+export async function createRateEdit(input: {
+  employeeId: number;
+  paymentCategoryId: number;
+  effectiveDate: string; // YYYY-MM-DD
+  rateCents: number;
+  note?: string | null;
+  createdByUserId: number;
+}) {
+  // Validate input using the shared Zod schema
+  const parsed = createRateEditSchema.safeParse({
+    employeeId: input.employeeId,
+    paymentCategoryId: input.paymentCategoryId,
+    effectiveDate: input.effectiveDate,
+    rateCents: input.rateCents,
+    note: input.note,
+  });
+
+  if (!parsed.success) {
+    throw new Error("Invalid rate edit data: " + parsed.error.message);
+  }
+
+  const now = new Date().toISOString();
+
+  const [inserted] = await db
+    .insert(schema.rateEdits)
+    .values({
+      employeeId: input.employeeId,
+      paymentCategoryId: input.paymentCategoryId,
+      effectiveDate: input.effectiveDate,
+      rateCents: input.rateCents,
+      createdAt: now,
+      createdByUserId: input.createdByUserId,
+      note: input.note ?? null,
+    })
+    .returning();
+
+  // Revalidate any paths that depend on rates (dashboard page)
+  await revalidatePath("/dashboard");
+
+  return inserted;
 }
