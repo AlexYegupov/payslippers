@@ -47,7 +47,7 @@ export function DateNavigation({
         <div className="flex items-center justify-between h-16 gap-4">
           {/* Title */}
           <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-            Payslippers
+            Payslippers🩴🩴
           </h1>
 
           {/* Date Navigation */}

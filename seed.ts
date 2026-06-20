@@ -97,6 +97,88 @@ async function seed() {
   ]);
   console.log("✓ Inserted rate events");
 
+  // Insert sample payslips
+  await db.insert(schema.payslips).values([
+    {
+      id: 1,
+      userId: 1,
+      employeeId: 1,
+      date: "2026-06-15",
+      originalTotalCents: 48000,
+      createdAt: "2026-06-15T10:00:00Z",
+    },
+    {
+      id: 2,
+      userId: 1,
+      employeeId: 1,
+      date: "2026-06-01",
+      originalTotalCents: 46800,
+      createdAt: "2026-06-01T10:00:00Z",
+    },
+    {
+      id: 3,
+      userId: 1,
+      employeeId: 2,
+      date: "2026-06-15",
+      originalTotalCents: 250000,
+      createdAt: "2026-06-15T10:00:00Z",
+    },
+    {
+      id: 4,
+      userId: 1,
+      employeeId: 3,
+      date: "2026-06-15",
+      originalTotalCents: 36000,
+      createdAt: "2026-06-15T10:00:00Z",
+    },
+  ]);
+  console.log("✓ Inserted payslips");
+
+  // Insert payslip line items
+  await db.insert(schema.payslipLineItems).values([
+    {
+      id: 1,
+      payslipId: 1,
+      paymentCategoryId: 1,
+      units: 40,
+      rateAtCreationCents: 1200,
+      originalTotalCents: 48000,
+    },
+    {
+      id: 2,
+      payslipId: 2,
+      paymentCategoryId: 1,
+      units: 36,
+      rateAtCreationCents: 1200,
+      originalTotalCents: 43200,
+    },
+    {
+      id: 3,
+      payslipId: 2,
+      paymentCategoryId: 2,
+      units: 2,
+      rateAtCreationCents: 1800,
+      originalTotalCents: 3600,
+    },
+    {
+      id: 4,
+      payslipId: 3,
+      paymentCategoryId: 4,
+      units: 1,
+      rateAtCreationCents: 250000,
+      originalTotalCents: 250000,
+    },
+    {
+      id: 5,
+      payslipId: 4,
+      paymentCategoryId: 1,
+      units: 40,
+      rateAtCreationCents: 900,
+      originalTotalCents: 36000,
+    },
+  ]);
+  console.log("✓ Inserted payslip line items");
+
   console.log("Seed completed successfully!");
 }
 

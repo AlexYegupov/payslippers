@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { DateNavigation } from "@/components/DateNavigation";
 import { EmployeeSelector, type Employee } from "@/components/EmployeeSelector";
+import { Payslips } from "@/components/Payslips";
 import { Rates } from "@/components/Rates";
 
 interface DashboardProps {
@@ -39,6 +40,8 @@ export function Dashboard({ employees }: DashboardProps) {
         selectedEmployee={selectedEmployee}
         effectiveDate={effectiveDate}
       />
+
+      <Payslips selectedEmployee={selectedEmployee} />
     </div>
   );
 }

@@ -687,6 +687,8 @@ rate_amount_cents
 - npm audit fixes 
 - drizzle migrations (not implemented for demo level)
 - minor: rename db entities names from plural to singular (as more traditional approach)
+- refactor: add react-router
+- refactor: use library for dates human-readable formatting
 
 ---
 
