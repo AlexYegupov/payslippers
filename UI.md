@@ -27,12 +27,11 @@ Use one page only. The first implementation should follow this main dashboard sh
 │ Rates:                                                                │
 │ Category       Rate       Effective from  Last edit                   │
 │ ───────────────────────────────────────────────────────────────────── │
-│ Hourly         $10.00     1/2/26          2 min ago*  [Edit]          │
-│ Overtime       $15.00     1/1/26          yesterday*  [Edit]          │
-│ Commission     $25.00     12/1/25         last week*  [Edit]          │
+│ Hourly         $10.00     1/2/26 10:30    2 min ago*    [Edit] [History] │
+│ Overtime       $15.00     1/1/26 09:00    yesterday*    [Edit] [History] │
+│ Commission     $25.00     12/1/25 08:00   last week*    [Edit] [History] │
 │                                                                       │
-│ Payslips:         
-  [ + ]
+│ Payslips:  [ Add ]
 │ ID   Employee   Date        Original total   Current total   Status   │
 │ 12   John Doe   2026-02-01  $100.00          $200.00         Changed  │
 │ 11   Jane Doe   2026-01-15  $750.00          $750.00         OK       │
@@ -132,11 +131,11 @@ Employee: [John Doe ▾]
 
 Rates:
 
-Category       Rate       Effective from  Last edit
-───────────────────────────────────────────────────
-Hourly         $10.00     1/2/26          2 min ago*  [Edit]
-Overtime       $15.00     1/1/26          yesterday*  [Edit]
-Commission     $25.00     12/1/25         last week*  [Edit]
+Category       Rate       Effective from  Last edit            Actions
+────────────────────────────────────────────────────────────────────
+Hourly         $10.00     1/2/26          2 min ago*           [Edit] [History]
+Overtime       $15.00     1/1/26          yesterday*           [Edit] [History]
+Commission     $25.00     12/1/25         last week*           [Edit] [History]
 ```
 
 Notes:
@@ -144,6 +143,36 @@ Notes:
 - `Effective from` is the effective date of the rate event currently active for the selected date.
 - `Last edit` is the creation time of that active rate event.
 - The `*` marker means the row is the active rate event for the selected effective date.
+- `[History]` opens a read-only inline drawer with the full rate-event history for that employee/category.
+
+### Rate history flow
+
+Clicking **History** opens an inline read-only drawer inside the dashboard:
+
+```text
+Rate history: John Doe / Hourly
+
+Effective from   Rate       Created             Active       Note
+────────────────────────────────────────────────────────────────────
+1/2/26           $10.00     2 min ago           Yes          Updated rate
+12/1/25          $8.00      last week           No           Initial rate
+10/1/25          $7.50      last month          No           Payroll review
+```
+
+Behavior:
+
+- The drawer title identifies the employee and payment category: `Rate history: John Doe / Hourly`.
+- Events are shown newest first by effective date and creation time.
+- Each row shows:
+  - `Effective from`;
+  - `Rate`;
+  - `Created`;
+  - whether it is active for the currently selected effective date;
+  - optional `Note`.
+- The active event for the selected effective date is marked with `Yes` and a subtle highlight.
+- The user can inspect history without leaving the dashboard.
+- The history drawer is read-only in the first implementation.
+- Closing the drawer returns focus to the `[History]` button in the Rates table.
 
 ### Rate edit flow
 
@@ -189,10 +218,10 @@ Purpose: create a dated payment using the rates that apply on the payslip date.
 The **Create payslip** form should not be a third top-level column. To keep the main dashboard close to the Payslippers layout, open payslip creation from the **Payslips** section:
 
 ```text
-Payslips: [Add payslip]
+Payslips: [Add]
 ```
 
-Clicking **Add payslip** opens an inline drawer inside the dashboard.
+Clicking **Add** opens an inline drawer inside the dashboard.
 
 ### Controls
 

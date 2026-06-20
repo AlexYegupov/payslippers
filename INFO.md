@@ -1,5 +1,72 @@
 # Finito — Home Assignment
 
+## ER-диаграмма базы данных
+
+```mermaid
+classDiagram
+    class users {
+        name
+    }
+    
+    class employees {
+        name
+        birthday
+    }
+    
+    class payment_categories {
+        name
+        unit_label
+    }
+    
+    class rate_events {
+        employee_id
+        payment_category_id
+        effective_at
+        rate_amount_cents
+        created_at
+        created_by_user_id
+        note
+    }
+    
+    class payslips {
+        user_id
+        employee_id
+        date
+        total_at_creation_cents
+        created_at
+    }
+    
+    class payslip_lines {
+        payslip_id
+        payment_category_id
+        units
+        rate_amount_cents_at_creation
+        total_at_creation_cents
+    }
+    
+    class payslip_dismissed_rate_events {
+        payslip_id
+        rate_event_id
+        dismissed_at
+        dismissed_by_user_id
+    }
+    
+    users --> "*" rate_events
+    users --> "*" payslips
+    users --> "*" payslip_dismissed_rate_events
+    
+    employees --> "*" rate_events
+    employees --> "*" payslips
+    
+    payment_categories --> "*" rate_events
+    payment_categories --> "*" payslip_lines
+    
+    rate_events --> "*" payslip_dismissed_rate_events
+    
+    payslips --> "*" payslip_lines
+    payslips --> "*" payslip_dismissed_rate_events
+```
+
 ## Итоговая рекомендация по модели данных
 
 Главное решение: **ставки хранятся как append-only история событий**, а не как одна текущая запись.
@@ -619,6 +686,7 @@ rate_amount_cents
 - Добавить тесты на уровне API/e2e.
 - npm audit fixes 
 - drizzle migrations (not implemented for demo level)
+- minor: rename db entities names from plural to singular (as more traditional approach)
 
 ---
 
