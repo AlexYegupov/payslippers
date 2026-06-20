@@ -21,6 +21,23 @@ export interface PayslipWithDetails {
   }>;
 }
 
+export interface PayslipDetail {
+  id: number;
+  employeeId: number;
+  employeeName: string;
+  date: string;
+  originalTotalCents: number;
+  createdAt: string;
+  lineItems: Array<{
+    id: number;
+    paymentCategoryName: string;
+    unitLabel: string;
+    units: number;
+    rateAtCreationCents: number;
+    originalTotalCents: number;
+  }>;
+}
+
 export async function getPayslipsForEmployee(
   employeeId: number,
 ): Promise<PayslipWithDetails[]> {
@@ -98,5 +115,61 @@ export async function getPayslipsForEmployee(
   } catch (error) {
     console.error("Error fetching payslips:", error);
     throw new Error("Failed to fetch payslips");
+  }
+}
+
+export async function getPayslipDetail(
+  payslipId: number,
+): Promise<PayslipDetail | null> {
+  try {
+    const payslip = await db
+      .select({
+        id: schema.payslips.id,
+        employeeId: schema.payslips.employeeId,
+        employeeName: schema.employees.name,
+        date: schema.payslips.date,
+        originalTotalCents: schema.payslips.originalTotalCents,
+        createdAt: schema.payslips.createdAt,
+      })
+      .from(schema.payslips)
+      .innerJoin(
+        schema.employees,
+        eq(schema.payslips.employeeId, schema.employees.id),
+      )
+      .where(eq(schema.payslips.id, payslipId))
+      .limit(1);
+
+    if (payslip.length === 0) {
+      return null;
+    }
+
+    const payslipData = payslip[0];
+
+    const lineItems = await db
+      .select({
+        id: schema.payslipLineItems.id,
+        paymentCategoryName: schema.paymentCategories.name,
+        unitLabel: schema.paymentCategories.unitLabel,
+        units: schema.payslipLineItems.units,
+        rateAtCreationCents: schema.payslipLineItems.rateAtCreationCents,
+        originalTotalCents: schema.payslipLineItems.originalTotalCents,
+      })
+      .from(schema.payslipLineItems)
+      .innerJoin(
+        schema.paymentCategories,
+        eq(
+          schema.payslipLineItems.paymentCategoryId,
+          schema.paymentCategories.id,
+        ),
+      )
+      .where(eq(schema.payslipLineItems.payslipId, payslipId));
+
+    return {
+      ...payslipData,
+      lineItems,
+    };
+  } catch (error) {
+    console.error("Error fetching payslip detail:", error);
+    throw new Error("Failed to fetch payslip details");
   }
 }

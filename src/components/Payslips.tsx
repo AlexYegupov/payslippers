@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { type Employee } from "./EmployeeSelector";
 import {
   getPayslipsForEmployee,
+  getPayslipDetail,
   type PayslipWithDetails,
+  type PayslipDetail,
 } from "@/server/actions/payslips";
 
 interface PayslipsProps {
@@ -15,6 +17,13 @@ export function Payslips({ selectedEmployee }: PayslipsProps) {
   const [payslips, setPayslips] = useState<PayslipWithDetails[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedPayslip, setSelectedPayslip] = useState<PayslipDetail | null>(
+    null,
+  );
+  const [payslipDetailLoading, setPayslipDetailLoading] = useState(false);
+  const [payslipDetailError, setPayslipDetailError] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!selectedEmployee) {
@@ -30,7 +39,9 @@ export function Payslips({ selectedEmployee }: PayslipsProps) {
         const data = await getPayslipsForEmployee(selectedEmployee.id);
         setPayslips(data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to fetch payslips");
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch payslips",
+        );
       } finally {
         setLoading(false);
       }
@@ -65,6 +76,27 @@ export function Payslips({ selectedEmployee }: PayslipsProps) {
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
     return formatDate(dateString);
+  };
+
+  const handleViewClick = async (payslip: PayslipWithDetails) => {
+    setPayslipDetailLoading(true);
+    setPayslipDetailError(null);
+
+    try {
+      const detail = await getPayslipDetail(payslip.id);
+      setSelectedPayslip(detail ?? null);
+    } catch (err) {
+      setPayslipDetailError(
+        err instanceof Error ? err.message : "Failed to fetch payslip details",
+      );
+    } finally {
+      setPayslipDetailLoading(false);
+    }
+  };
+
+  const handleClosePayslipDetail = () => {
+    setSelectedPayslip(null);
+    setPayslipDetailError(null);
   };
 
   if (!selectedEmployee) {
@@ -135,6 +167,9 @@ export function Payslips({ selectedEmployee }: PayslipsProps) {
               <thead className="bg-zinc-50 dark:bg-zinc-800">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                    Employee
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
                     Date
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
@@ -157,6 +192,11 @@ export function Payslips({ selectedEmployee }: PayslipsProps) {
                     key={payslip.id}
                     className="hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                   >
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                        {payslip.employeeName}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
                         {formatDate(payslip.date)}
@@ -191,6 +231,7 @@ export function Payslips({ selectedEmployee }: PayslipsProps) {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
+                        onClick={() => handleViewClick(payslip)}
                         className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
                         title="View payslip details"
                       >
@@ -204,6 +245,147 @@ export function Payslips({ selectedEmployee }: PayslipsProps) {
           </div>
         )}
       </div>
+
+      {/* Payslip Detail Drawer */}
+      {selectedPayslip && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl max-w-3xl w-full border border-zinc-200 dark:border-zinc-800 max-h-[80vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                  Payslip Details
+                </h3>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                  {selectedPayslip.employeeName} -{" "}
+                  {formatDate(selectedPayslip.date)}
+                </p>
+              </div>
+              <button
+                onClick={handleClosePayslipDetail}
+                className="text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              {payslipDetailLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : payslipDetailError ? (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                  <p className="text-sm text-red-800 dark:text-red-200">
+                    {payslipDetailError}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Summary Section */}
+                  <div className="bg-zinc-50 dark:bg-zinc-800 rounded-lg p-4 border border-zinc-200 dark:border-zinc-700">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                          Total Amount
+                        </p>
+                        <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50 mt-1">
+                          {formatCurrency(selectedPayslip.originalTotalCents)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                          Payslip Date
+                        </p>
+                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50 mt-1">
+                          {formatDate(selectedPayslip.date)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Line Items Section */}
+                  <div>
+                    <h4 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
+                      Line Items
+                    </h4>
+                    <div className="space-y-3">
+                      {selectedPayslip.lineItems.map((item) => (
+                        <div
+                          key={item.id}
+                          className="bg-zinc-50 dark:bg-zinc-800 rounded-lg p-4 border border-zinc-200 dark:border-zinc-700"
+                        >
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                                {item.paymentCategoryName}
+                              </p>
+                              <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
+                                {item.unitLabel}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                                {formatCurrency(item.originalTotalCents)}
+                              </p>
+                              <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
+                                {item.units} ×{" "}
+                                {formatCurrency(item.rateAtCreationCents)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Additional Info Section */}
+                  <div className="bg-zinc-50 dark:bg-zinc-800 rounded-lg p-4 border border-zinc-200 dark:border-zinc-700">
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                          Created
+                        </p>
+                        <p className="text-sm text-zinc-900 dark:text-zinc-50">
+                          {formatRelativeTime(selectedPayslip.createdAt)}
+                        </p>
+                      </div>
+                      <div className="flex justify-between">
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                          Employee ID
+                        </p>
+                        <p className="text-sm text-zinc-900 dark:text-zinc-50">
+                          {selectedPayslip.employeeId}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
+              <button
+                onClick={handleClosePayslipDetail}
+                className="w-full bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-zinc-800 dark:text-zinc-200 font-medium py-2 px-4 rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
