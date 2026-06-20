@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DateNavigation } from "@/components/DateNavigation";
 import { EmployeeSelector, type Employee } from "@/components/EmployeeSelector";
+import { Rates } from "@/components/Rates";
 
 interface DashboardProps {
   employees: Employee[];
@@ -11,8 +12,15 @@ interface DashboardProps {
 export function Dashboard({ employees }: DashboardProps) {
   const [effectiveDate, setEffectiveDate] = useState<Date>(new Date());
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
-    null,
+    employees.length > 0 ? employees[0] : null,
   );
+
+  // Update selected employee when employees list changes
+  useEffect(() => {
+    if (employees.length > 0 && !selectedEmployee) {
+      setSelectedEmployee(employees[0]);
+    }
+  }, [employees, selectedEmployee]);
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
@@ -27,14 +35,10 @@ export function Dashboard({ employees }: DashboardProps) {
         onEmployeeChange={setSelectedEmployee}
       />
 
-      {/* Placeholder for future sections */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-8">
-          <p className="text-zinc-600 dark:text-zinc-400 text-center">
-            Dashboard content will be added here
-          </p>
-        </div>
-      </div>
+      <Rates
+        selectedEmployee={selectedEmployee}
+        effectiveDate={effectiveDate}
+      />
     </div>
   );
 }
