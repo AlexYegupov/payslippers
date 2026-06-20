@@ -5,6 +5,7 @@ import { type Employee } from "./EmployeeSelector";
 import {
   getPayslipsForEmployee,
   getPayslipDetail,
+  dismissRateEditForPayslip,
   type PayslipWithDetails,
   type PayslipDetail,
 } from "@/server/actions/payslips";
@@ -99,6 +100,27 @@ export function Payslips({ selectedEmployee }: PayslipsProps) {
     setPayslipDetailError(null);
   };
 
+  const handleDismissRateEdit = async (
+    payslipId: number,
+    rateEditId: number,
+  ) => {
+    try {
+      await dismissRateEditForPayslip(payslipId, rateEditId);
+      // Refresh payslips list
+      if (selectedEmployee) {
+        const data = await getPayslipsForEmployee(selectedEmployee.id);
+        setPayslips(data);
+      }
+      // Refresh detail view if open
+      if (selectedPayslip) {
+        const detail = await getPayslipDetail(selectedPayslip.id);
+        setSelectedPayslip(detail ?? null);
+      }
+    } catch (err) {
+      console.error("Failed to dismiss rate edit:", err);
+    }
+  };
+
   if (!selectedEmployee) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -173,7 +195,10 @@ export function Payslips({ selectedEmployee }: PayslipsProps) {
                     Date
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                    Total
+                    Original Total
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                    Current Total
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
                     Created
@@ -190,7 +215,11 @@ export function Payslips({ selectedEmployee }: PayslipsProps) {
                 {payslips.map((payslip) => (
                   <tr
                     key={payslip.id}
-                    className="hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                    className={`hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors ${
+                      payslip.isRetroactivelyChanged
+                        ? "bg-amber-50 dark:bg-amber-900/20"
+                        : ""
+                    }`}
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
@@ -205,6 +234,22 @@ export function Payslips({ selectedEmployee }: PayslipsProps) {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-zinc-900 dark:text-zinc-50 font-mono">
                         {formatCurrency(payslip.originalTotalCents)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div
+                        className={`text-sm font-mono font-medium ${
+                          payslip.isRetroactivelyChanged
+                            ? "text-amber-700 dark:text-amber-400"
+                            : "text-zinc-900 dark:text-zinc-50"
+                        }`}
+                      >
+                        {formatCurrency(payslip.currentTotalCents)}
+                        {payslip.isRetroactivelyChanged && (
+                          <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">
+                            ⚠
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -294,11 +339,17 @@ export function Payslips({ selectedEmployee }: PayslipsProps) {
               ) : (
                 <div className="space-y-6">
                   {/* Summary Section */}
-                  <div className="bg-zinc-50 dark:bg-zinc-800 rounded-lg p-4 border border-zinc-200 dark:border-zinc-700">
+                  <div
+                    className={`rounded-lg p-4 border ${
+                      selectedPayslip.isRetroactivelyChanged
+                        ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800"
+                        : "bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
+                    }`}
+                  >
                     <div className="flex justify-between items-center">
                       <div>
                         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                          Total Amount
+                          Original Total
                         </p>
                         <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50 mt-1">
                           {formatCurrency(selectedPayslip.originalTotalCents)}
@@ -306,14 +357,67 @@ export function Payslips({ selectedEmployee }: PayslipsProps) {
                       </div>
                       <div className="text-right">
                         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                          Payslip Date
+                          Current Total
                         </p>
-                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50 mt-1">
-                          {formatDate(selectedPayslip.date)}
+                        <p
+                          className={`text-2xl font-semibold mt-1 ${
+                            selectedPayslip.isRetroactivelyChanged
+                              ? "text-amber-700 dark:text-amber-400"
+                              : "text-zinc-900 dark:text-zinc-50"
+                          }`}
+                        >
+                          {formatCurrency(selectedPayslip.currentTotalCents)}
                         </p>
                       </div>
                     </div>
+                    {selectedPayslip.isRetroactivelyChanged && (
+                      <div className="mt-3 pt-3 border-t border-amber-200 dark:border-amber-800">
+                        <p className="text-sm text-amber-700 dark:text-amber-400">
+                          ⚠ This payslip has been retroactively changed by rate
+                          edits
+                        </p>
+                      </div>
+                    )}
                   </div>
+
+                  {/* Retroactive Rate Edits Section */}
+                  {selectedPayslip.isRetroactivelyChanged &&
+                    selectedPayslip.retroactiveRateEdits.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium text-amber-700 dark:text-amber-400 mb-3">
+                          Retroactive Rate Changes
+                        </h4>
+                        <div className="space-y-2">
+                          {selectedPayslip.retroactiveRateEdits.map((edit) => (
+                            <div
+                              key={edit.rateEventId}
+                              className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 border border-amber-200 dark:border-amber-800 flex justify-between items-center"
+                            >
+                              <div>
+                                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                                  {edit.paymentCategoryName}
+                                </p>
+                                <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                                  Effective {formatDate(edit.effectiveDate)} •{" "}
+                                  {formatCurrency(edit.rateCents)}/unit
+                                </p>
+                              </div>
+                              <button
+                                onClick={() =>
+                                  handleDismissRateEdit(
+                                    selectedPayslip.id,
+                                    edit.rateEventId,
+                                  )
+                                }
+                                className="text-xs bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-700 dark:text-zinc-300 px-3 py-1 rounded transition-colors"
+                              >
+                                Dismiss
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                   {/* Line Items Section */}
                   <div>
