@@ -9,7 +9,9 @@
     "lint": "eslint",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx seed.ts",
-    "db:reset": "tsx reset.ts"
+    "db:reset": "tsx reset.ts",
+    "db:console": "sqlite3 local.db",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
