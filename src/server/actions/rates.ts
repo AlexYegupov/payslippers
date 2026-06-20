@@ -115,3 +115,34 @@ export async function createRateEdit(input: {
 
   return inserted;
 }
+
+/**
+ * Get the complete history of rate edits for a specific employee and payment category.
+ * Returns all rate events ordered by effective date (most recent first).
+ */
+export async function getRateHistory(
+  employeeId: number,
+  paymentCategoryId: number,
+): Promise<RateWithCategory["rate"][]> {
+  try {
+    const history = await db
+      .select()
+      .from(schema.rateEdits)
+      .where(
+        and(
+          eq(schema.rateEdits.employeeId, employeeId),
+          eq(schema.rateEdits.paymentCategoryId, paymentCategoryId),
+        ),
+      )
+      .orderBy(
+        desc(schema.rateEdits.effectiveDate),
+        desc(schema.rateEdits.createdAt),
+        desc(schema.rateEdits.id),
+      );
+
+    return history;
+  } catch (error) {
+    console.error("Error fetching rate history:", error);
+    throw new Error("Failed to fetch rate history");
+  }
+}
