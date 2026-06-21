@@ -683,6 +683,7 @@ rate_amount_cents
 - refactor: DRY for trivial cases in code (like functions  formatRelativeTime, formatRelativeTime, getTodayString etc)
 - improve: use tRPC for server-client communication
 - improve: use db user everywhere instead of consts
+- harmonize ugly identifiers (like payslips.total_at_creation_cents and payslip_lines.rate_amount_cents_at_creation)
 
 ---
 

@@ -101,7 +101,7 @@ Behavior:
 - Writing:
   - adding or editing a rate creates a new rate event with `effectiveDate = selected date`;
   - the selected date is shown in the rate edit form by default;
-  - the payslip creation date defaults to the selected date.
+  - the payslip creation date defaults to now.
 
 Control behavior:
 

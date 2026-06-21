@@ -56,7 +56,6 @@ describe("Payslip Creation", () => {
       expect(result.employeeId).toBe(1);
       expect(result.date).toBe("2026-02-01");
       expect(result.originalTotalCents).toBe(120000); // 100 * 1200
-      createdPayslipIds.push(result.id);
 
       // Verify the payslip exists in the database
       const payslip = await db
@@ -91,7 +90,6 @@ describe("Payslip Creation", () => {
 
       expect(result).toBeDefined();
       expect(result.originalTotalCents).toBe(114000); // 96000 + 18000
-      createdPayslipIds.push(result.id);
 
       // Verify line items
       const lineItems = await db
@@ -165,7 +163,6 @@ describe("Payslip Creation", () => {
 
       expect(payslip).toBeDefined();
       expect(payslip.originalTotalCents).toBe(250000); // $2,500.00
-      createdPayslipIds.push(result.id);
     });
   });
 
@@ -186,7 +183,6 @@ describe("Payslip Creation", () => {
       expect(lineItems.length).toBe(1);
       expect(lineItems[0].rateAtCreationCents).toBe(1200);
       expect(lineItems[0].originalTotalCents).toBe(60000); // 50 * 1200
-      createdPayslipIds.push(result.id);
     });
 
     it("should store the newer rate when a rate change exists before the payslip date", async () => {
@@ -206,7 +202,6 @@ describe("Payslip Creation", () => {
       expect(lineItems.length).toBe(1);
       expect(lineItems[0].rateAtCreationCents).toBe(900); // $9/hr
       expect(lineItems[0].originalTotalCents).toBe(36000); // 40 * 900
-      createdPayslipIds.push(result.id);
     });
   });
 
@@ -236,9 +231,6 @@ describe("Payslip Creation", () => {
           note: "Retroactive rate change",
         })
         .returning();
-
-      createdRateEventIds.push(retroRateEdit.id);
-      createdPayslipIds.push(payslip.id);
 
       // Link the rate edit to the payslip
       await db.insert(schema.rateEventPayslips).values({

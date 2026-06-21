@@ -10,7 +10,8 @@
     "db:push": "drizzle-kit push",
     "db:seed": "tsx seed.ts",
     "db:reset": "tsx reset.ts",
-    "db:recreate": "rm -f local.db && sqlite3 local.db < initial.sql && npm run db:seed",
+    "db:setup": "sqlite3 local.db < initial.sql && npm run db:seed",
+    "db:recreate": "rm -f local.db && npm run db:setup",
     "db:console": "sqlite3 local.db",
     "db:studio": "drizzle-kit studio"
   },
