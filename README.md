@@ -184,6 +184,16 @@ cd apps/web
 npm install
 ```
 
+### Environment
+
+The app reads `DATABASE_URL` from your environment (via `.env`). It defaults to `file:local.db` if not set. To use the default, no `.env` file is needed — just make sure the working directory is `apps/web`.
+
+To use a custom path, create `.env`:
+
+```bash
+DATABASE_URL=file:local.db
+```
+
 ### Database Setup
 
 The app uses a local SQLite database (`local.db`). To create the schema and seed initial data:
