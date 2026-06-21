@@ -1,5 +1,6 @@
 PRAGMA foreign_keys = ON;
 
+DROP TABLE IF EXISTS rate_event_payslips;
 DROP TABLE IF EXISTS payslip_dismissed_rate_events;
 DROP TABLE IF EXISTS payslip_lines;
 DROP TABLE IF EXISTS payslips;
@@ -99,24 +100,20 @@ CREATE TABLE payslip_lines (
 CREATE INDEX idx_payslip_lines_payslip
 ON payslip_lines (payslip_id);
 
-CREATE TABLE payslip_dismissed_rate_events (
-  payslip_id INTEGER NOT NULL REFERENCES payslips(id) ON DELETE CASCADE,
+CREATE TABLE rate_event_payslips (
   rate_event_id INTEGER NOT NULL REFERENCES rate_events(id) ON DELETE CASCADE,
-
-  dismissed_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  dismissed_by_user_id INTEGER NOT NULL DEFAULT 1 REFERENCES users(id),
-
-  PRIMARY KEY (payslip_id, rate_event_id)
+  payslip_id INTEGER NOT NULL REFERENCES payslips(id) ON DELETE CASCADE,
+  is_dismissed INTEGER NOT NULL DEFAULT 0,
+  dismissed_at TEXT,
+  dismissed_by_user_id INTEGER REFERENCES users(id),
+  PRIMARY KEY (rate_event_id, payslip_id)
 );
 
-CREATE INDEX idx_payslip_dismissals_payslip
-ON payslip_dismissed_rate_events (payslip_id, rate_event_id);
+CREATE INDEX idx_rate_event_payslips_payslip_id
+ON rate_event_payslips (payslip_id);
 
-CREATE INDEX idx_payslip_dismissals_rate_event
-ON payslip_dismissed_rate_events (rate_event_id, payslip_id);
-
-CREATE TRIGGER validate_payslip_dismissed_rate_event_insert
-BEFORE INSERT ON payslip_dismissed_rate_events
+CREATE TRIGGER validate_rate_event_payslip_insert
+BEFORE INSERT ON rate_event_payslips
 WHEN NOT EXISTS (
   SELECT 1
   FROM payslips p
@@ -128,82 +125,10 @@ WHEN NOT EXISTS (
     AND e.employee_id = p.employee_id
     AND e.payment_category_id = pl.payment_category_id
     AND e.effective_at <= p.date
-    AND e.created_at > p.created_at
 )
 BEGIN
   SELECT RAISE(
     ABORT,
-    'rate_event_id must be a post-creation rate edit that affects payslip_id'
+    'rate_event_id must be a rate edit that affects payslip_id'
   );
 END;
-
-INSERT INTO users (id, name)
-VALUES (1, 'Payroll Specialist');
-
-INSERT INTO employees (id, name, birthday)
-VALUES
-  (1, 'John Doe', '1990-01-15'),
-  (2, 'Jane Smith', '1988-07-22'),
-  (3, 'Alex Brown', '1995-03-10');
-
-INSERT INTO payment_categories (id, name, unit_label)
-VALUES
-  (1, 'Hourly Rate', 'hour'),
-  (2, 'Overtime Hourly', 'hour'),
-  (3, 'Commission', 'configured minor unit'),
-  (4, 'Global Pay', 'pay period');
-
--- Baseline rates make the database immediately usable for demo flows.
--- Time-based rates are stored as cents per hour.
--- Example: 1200 cents/hour = $12/hour.
-INSERT INTO rate_events (
-  id,
-  employee_id,
-  payment_category_id,
-  effective_at,
-  rate_amount_cents,
-  created_at,
-  created_by_user_id,
-  note
-)
-VALUES
-  (
-    1,
-    1,
-    1,
-    '2026-01-01',
-    1200,
-    '2026-01-01T09:00:00Z',
-    1,
-    'John Doe hourly baseline: 1200 cents/hour = $12/hour'
-  ),
-  (
-    2,
-    1,
-    2,
-    '2026-01-01',
-    1800,
-    '2026-01-01T09:00:00Z',
-    1,
-    'John Doe overtime baseline: 1800 cents/hour = $18/hour'
-  ),
-  (
-    3,
-    2,
-    4,
-    '2026-01-01',
-    250000,
-    '2026-01-01T09:00:00Z',
-    1,
-    'Jane Smith global pay baseline: $2,500 per pay period'
-  ),
-  (
-    4,
-    3,
-    1,
-    '2026-01-01',
-    900,
-    '2026-01-01T09:00:00Z',
-    1,
-    'Alex Brown hourly baseline: 900 cents/hour = $9/hour'
-  );

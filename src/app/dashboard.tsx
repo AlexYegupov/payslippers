@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { DateNavigation } from "@/components/DateNavigation";
 import { EmployeeSelector, type Employee } from "@/components/EmployeeSelector";
 import { Payslips } from "@/components/Payslips";
@@ -15,6 +15,7 @@ export function Dashboard({ employees }: DashboardProps) {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
     employees.length > 0 ? employees[0] : null,
   );
+  const [payslipRefreshKey, setPayslipRefreshKey] = useState(0);
 
   // Update selected employee when employees list changes
   useEffect(() => {
@@ -22,6 +23,10 @@ export function Dashboard({ employees }: DashboardProps) {
       setSelectedEmployee(employees[0]);
     }
   }, [employees, selectedEmployee]);
+
+  const handleRatesChange = useCallback(() => {
+    setPayslipRefreshKey((k) => k + 1);
+  }, []);
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
@@ -39,9 +44,13 @@ export function Dashboard({ employees }: DashboardProps) {
       <Rates
         selectedEmployee={selectedEmployee}
         effectiveDate={effectiveDate}
+        onRatesChange={handleRatesChange}
       />
 
-      <Payslips selectedEmployee={selectedEmployee} />
+      <Payslips
+        selectedEmployee={selectedEmployee}
+        refreshKey={payslipRefreshKey}
+      />
     </div>
   );
 }

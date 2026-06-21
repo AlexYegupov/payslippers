@@ -12,9 +12,14 @@ import {
 interface RatesProps {
   selectedEmployee: Employee | null;
   effectiveDate: Date;
+  onRatesChange?: () => void;
 }
 
-export function Rates({ selectedEmployee, effectiveDate }: RatesProps) {
+export function Rates({
+  selectedEmployee,
+  effectiveDate,
+  onRatesChange,
+}: RatesProps) {
   const [rates, setRates] = useState<RateWithCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -152,6 +157,7 @@ export function Rates({ selectedEmployee, effectiveDate }: RatesProps) {
         effectiveDateStr,
       );
       setRates(data);
+      onRatesChange?.();
     } catch (err) {
       setEditError(
         err instanceof Error ? err.message : "Failed to update rate",
@@ -426,7 +432,10 @@ export function Rates({ selectedEmployee, effectiveDate }: RatesProps) {
                     onChange={(e) =>
                       setEditForm({
                         ...editForm,
-                        rateCents: Math.round(parseFloat(e.target.value) * 100),
+                        rateCents:
+                          e.target.value === ""
+                            ? 0
+                            : Math.round(parseFloat(e.target.value) * 100),
                       })
                     }
                     className="w-full pl-7 pr-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 focus:ring-2 focus:ring-blue-500 focus:border-transparent"

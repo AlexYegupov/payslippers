@@ -1,8 +1,8 @@
 "use server";
 
-import { db } from "@/server/db";
+import { db, sqlite } from "@/server/db";
 import * as schema from "@/server/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, gte } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { createRateEditSchema } from "@/server/db/schema";
 
@@ -79,7 +79,7 @@ export async function createRateEdit(input: {
   paymentCategoryId: number;
   effectiveDate: string; // YYYY-MM-DD
   rateCents: number;
-  note?: string | null;
+  note?: string | null | undefined;
   createdByUserId: number;
 }) {
   // Validate input using the shared Zod schema
@@ -109,6 +109,26 @@ export async function createRateEdit(input: {
       note: input.note ?? null,
     })
     .returning();
+
+  // Populate rate_event_payslips link table for all affected payslips
+  sqlite
+    .prepare(
+      `
+    INSERT OR IGNORE INTO rate_event_payslips (rate_event_id, payslip_id, is_dismissed)
+    SELECT ?, p.id, 0
+    FROM payslips p
+    JOIN payslip_lines pl ON pl.payslip_id = p.id
+    WHERE p.employee_id = ?
+      AND pl.payment_category_id = ?
+      AND p.date >= ?
+  `,
+    )
+    .run(
+      inserted.id,
+      input.employeeId,
+      input.paymentCategoryId,
+      input.effectiveDate,
+    );
 
   // Revalidate any paths that depend on rates (dashboard page)
   await revalidatePath("/dashboard");

@@ -12,7 +12,7 @@ function resetDatabase() {
 
   // Delete data in correct order to respect foreign keys
   const tables = [
-    "payslip_dismissed_rate_events",
+    "rate_event_payslips",
     "payslip_lines",
     "payslips",
     "rate_events",

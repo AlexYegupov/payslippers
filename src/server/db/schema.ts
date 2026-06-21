@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, sqliteTable, text, index } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
 import { z } from "zod";
 
@@ -38,10 +38,18 @@ export const rateEdits = sqliteTable(
       .references(() => users.id),
     note: text("note"),
   },
-  (table) => ({
-    asOfIndex: sql`CREATE INDEX idx_rate_events_as_of ON ${table} (employee_id, payment_category_id, effective_at DESC, created_at DESC, id DESC)`,
-    createdAfterIndex: sql`CREATE INDEX idx_rate_events_created_after ON ${table} (created_at, employee_id, payment_category_id, effective_at DESC)`,
-  }),
+  (table) => [
+    index("idx_rate_events_as_of").on(
+      table.employeeId,
+      table.paymentCategoryId,
+      table.effectiveDate,
+    ),
+    index("idx_rate_events_created_after").on(
+      table.createdAt,
+      table.employeeId,
+      table.paymentCategoryId,
+    ),
+  ],
 );
 
 export const payslips = sqliteTable(
@@ -58,10 +66,10 @@ export const payslips = sqliteTable(
     originalTotalCents: integer("total_at_creation_cents").notNull(),
     createdAt: text("created_at").notNull(),
   },
-  (table) => ({
-    createdAtIndex: sql`CREATE INDEX idx_payslips_created_at ON ${table} (created_at)`,
-    employeeDateIndex: sql`CREATE INDEX idx_payslips_employee_date ON ${table} (employee_id, date)`,
-  }),
+  (table) => [
+    index("idx_payslips_created_at").on(table.createdAt),
+    index("idx_payslips_employee_date").on(table.employeeId, table.date),
+  ],
 );
 
 export const payslipLineItems = sqliteTable(
@@ -78,35 +86,32 @@ export const payslipLineItems = sqliteTable(
     rateAtCreationCents: integer("rate_amount_cents_at_creation").notNull(),
     originalTotalCents: integer("total_at_creation_cents").notNull(),
   },
-  (table) => ({
-    payslipIndex: sql`CREATE INDEX idx_payslip_lines_payslip ON ${table} (payslip_id)`,
-  }),
+  (table) => [index("idx_payslip_lines_payslip").on(table.payslipId)],
 );
 
-export const payslipDismissedRateEdits = sqliteTable(
-  "payslip_dismissed_rate_events",
+export const rateEventPayslips = sqliteTable(
+  "rate_event_payslips",
   {
+    rateEventId: integer("rate_event_id")
+      .notNull()
+      .references(() => rateEdits.id, { onDelete: "cascade" }),
     payslipId: integer("payslip_id")
       .notNull()
       .references(() => payslips.id, { onDelete: "cascade" }),
-    rateEditId: integer("rate_event_id")
+    isDismissed: integer("is_dismissed", { mode: "boolean" })
       .notNull()
-      .references(() => rateEdits.id, { onDelete: "cascade" }),
-    dismissedAt: text("dismissed_at").notNull(),
-    dismissedByUserId: integer("dismissed_by_user_id")
-      .notNull()
-      .references(() => users.id),
+      .default(false),
+    dismissedAt: text("dismissed_at"),
+    dismissedByUserId: integer("dismissed_by_user_id").references(
+      () => users.id,
+    ),
   },
-  (table) => ({
-    payslipIndex: sql`CREATE INDEX idx_payslip_dismissals_payslip ON ${table} (payslip_id, rate_event_id)`,
-    rateEventIndex: sql`CREATE INDEX idx_payslip_dismissals_rate_event ON ${table} (rate_event_id, payslip_id)`,
-  }),
+  (table) => [index("idx_rate_event_payslips_payslip_id").on(table.payslipId)],
 );
 
 export const userRelations = relations(users, ({ many }) => ({
   rateEdits: many(rateEdits),
   payslips: many(payslips),
-  dismissedRateEdits: many(payslipDismissedRateEdits),
 }));
 
 export const employeeRelations = relations(employees, ({ many }) => ({
@@ -135,7 +140,7 @@ export const rateEditRelations = relations(rateEdits, ({ one, many }) => ({
     fields: [rateEdits.createdByUserId],
     references: [users.id],
   }),
-  dismissals: many(payslipDismissedRateEdits),
+  payslipLinks: many(rateEventPayslips),
 }));
 
 export const payslipRelations = relations(payslips, ({ one, many }) => ({
@@ -148,7 +153,7 @@ export const payslipRelations = relations(payslips, ({ one, many }) => ({
     references: [employees.id],
   }),
   lineItems: many(payslipLineItems),
-  dismissedRateEdits: many(payslipDismissedRateEdits),
+  rateEventLinks: many(rateEventPayslips),
 }));
 
 export const payslipLineItemRelations = relations(
@@ -165,19 +170,19 @@ export const payslipLineItemRelations = relations(
   }),
 );
 
-export const payslipDismissedRateEditRelations = relations(
-  payslipDismissedRateEdits,
+export const rateEventPayslipRelations = relations(
+  rateEventPayslips,
   ({ one }) => ({
-    payslip: one(payslips, {
-      fields: [payslipDismissedRateEdits.payslipId],
-      references: [payslips.id],
-    }),
-    rateEdit: one(rateEdits, {
-      fields: [payslipDismissedRateEdits.rateEditId],
+    rateEvent: one(rateEdits, {
+      fields: [rateEventPayslips.rateEventId],
       references: [rateEdits.id],
     }),
+    payslip: one(payslips, {
+      fields: [rateEventPayslips.payslipId],
+      references: [payslips.id],
+    }),
     dismissedByUser: one(users, {
-      fields: [payslipDismissedRateEdits.dismissedByUserId],
+      fields: [rateEventPayslips.dismissedByUserId],
       references: [users.id],
     }),
   }),
@@ -188,7 +193,7 @@ export const createRateEditSchema = z.object({
   paymentCategoryId: z.number().int().positive(),
   effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   rateCents: z.number().int().nonnegative(),
-  note: z.string().max(500).optional(),
+  note: z.string().max(500).nullable().optional(),
 });
 
 export const dismissRateEditForPayslipSchema = z.object({

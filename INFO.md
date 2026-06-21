@@ -44,16 +44,17 @@ classDiagram
         total_at_creation_cents
     }
     
-    class payslip_dismissed_rate_events {
-        payslip_id
+    class rate_event_payslips {
         rate_event_id
+        payslip_id
+        is_dismissed
         dismissed_at
         dismissed_by_user_id
     }
     
     users --> "*" rate_events
     users --> "*" payslips
-    users --> "*" payslip_dismissed_rate_events
+    users --> "*" rate_event_payslips
     
     employees --> "*" rate_events
     employees --> "*" payslips
@@ -61,10 +62,10 @@ classDiagram
     payment_categories --> "*" rate_events
     payment_categories --> "*" payslip_lines
     
-    rate_events --> "*" payslip_dismissed_rate_events
+    rate_events --> "*" rate_event_payslips
     
     payslips --> "*" payslip_lines
-    payslips --> "*" payslip_dismissed_rate_events
+    payslips --> "*" rate_event_payslips
 ```
 
 ## Итоговая рекомендация по модели данных
@@ -154,7 +155,7 @@ payment_categories
 rate_events
 payslips
 payslip_lines
-payslip_dismissed_rate_events
+rate_event_payslips
 ```
 
 ### `users`
@@ -216,26 +217,31 @@ total_at_creation_cents
 UNIQUE (payslip_id, payment_category_id)
 ```
 
-### `payslip_dismissed_rate_events`
+### `rate_event_payslips`
 
-Dismissal хранится как:
+Связка rate events и payslips. Заполняется при создании rate event для всех затронутых payslips.
 
 ```text
-payslip_id + rate_event_id
+rate_event_id + payslip_id
 ```
 
 Семантика:
 
 ```text
-For this payslip, ignore this rate_event when recalculating current total.
+This rate_event affects this payslip. If is_dismissed = true, ignore it when recalculating current total.
 ```
 
-Почему не `payslip_line_id`:
+Поля:
 
-- пользователь видит действие на уровне payslip;
-- в ТЗ dismissal применяется к payslip;
-- дубликаты категории внутри payslip запрещены, поэтому для payslip есть не более одной строки с нужной категорией;
-- `rate_event_id` уже содержит employee/category/effective date.
+- `is_dismissed` — флаг dismissal (заменяет отдельную таблицу `payslip_dismissed_rate_events`)
+- `dismissed_at`, `dismissed_by_user_id` — метаданные dismissal
+
+Почему связка вместо отдельной таблицы dismissal:
+
+- Все rate events, влияющие на payslip, уже в связке
+- Dismissal = флаг `is_dismissed` на существующей строке
+- При чтении: текущая ставка = последний non-dismissed по `effective_at DESC`
+- При dismissal: следующий non-dismissed автоматически становится текущим
 
 ---
 
@@ -292,14 +298,13 @@ CREATE TABLE payslip_lines (
   CHECK (total_at_creation_cents = units * rate_amount_cents_at_creation)
 );
 
-CREATE TABLE payslip_dismissed_rate_events (
-  payslip_id INTEGER NOT NULL REFERENCES payslips(id) ON DELETE CASCADE,
+CREATE TABLE rate_event_payslips (
   rate_event_id INTEGER NOT NULL REFERENCES rate_events(id) ON DELETE CASCADE,
-
-  dismissed_at TEXT NOT NULL,
-  dismissed_by_user_id INTEGER NOT NULL DEFAULT 1 REFERENCES users(id),
-
-  PRIMARY KEY (payslip_id, rate_event_id)
+  payslip_id INTEGER NOT NULL REFERENCES payslips(id) ON DELETE CASCADE,
+  is_dismissed INTEGER NOT NULL DEFAULT 0,
+  dismissed_at TEXT,
+  dismissed_by_user_id INTEGER REFERENCES users(id),
+  PRIMARY KEY (rate_event_id, payslip_id)
 );
 ```
 
@@ -406,7 +411,7 @@ Payslip считается ретроактивно изменённым, есл
 5. current_total_cents != original_total_cents.
 ```
 
-SQL для поиска таких payslips:
+SQL для поиска таких payslips (через связку rate_event_payslips):
 
 ```sql
 SELECT p.id
@@ -415,17 +420,13 @@ JOIN payslip_lines pl
   ON pl.payslip_id = p.id
 WHERE EXISTS (
   SELECT 1
-  FROM rate_events e
-  WHERE e.employee_id = p.employee_id
-    AND e.payment_category_id = pl.payment_category_id
-    AND e.effective_at <= p.date
-    AND e.created_at > p.created_at
-    AND NOT EXISTS (
-      SELECT 1
-      FROM payslip_dismissed_rate_events d
-      WHERE d.payslip_id = p.id
-        AND d.rate_event_id = e.id
-    )
+  FROM rate_event_payslips rep
+  JOIN rate_events re
+    ON re.id = rep.rate_event_id
+  WHERE rep.payslip_id = p.id
+    AND re.employee_id = p.employee_id
+    AND re.payment_category_id = pl.payment_category_id
+    AND rep.is_dismissed = 0
 )
 GROUP BY p.id;
 ```
@@ -436,21 +437,17 @@ GROUP BY p.id;
 
 `current_total` вычисляется на лету.
 
-Для каждой payslip line нужно найти последний non-dismissed rate event, который применялся на дату payslip:
+Для каждой payslip line нужно найти последний non-dismissed rate event из связки:
 
 ```sql
-SELECT e.rate_amount_cents
-FROM rate_events e
-WHERE e.employee_id = :employee_id
-  AND e.payment_category_id = :payment_category_id
-  AND e.effective_at <= :payslip_date
-  AND NOT EXISTS (
-    SELECT 1
-    FROM payslip_dismissed_rate_events d
-    WHERE d.payslip_id = :payslip_id
-      AND d.rate_event_id = e.id
-  )
-ORDER BY e.effective_at DESC, e.created_at DESC, e.id DESC
+SELECT re.rate_amount_cents
+FROM rate_event_payslips rep
+JOIN rate_events re
+  ON re.id = rep.rate_event_id
+WHERE rep.payslip_id = :payslip_id
+  AND re.payment_category_id = :payment_category_id
+  AND rep.is_dismissed = 0
+ORDER BY re.effective_at DESC, re.created_at DESC, re.id DESC
 LIMIT 1;
 ```
 
@@ -474,52 +471,37 @@ Dismissal не удаляет rate event. Он только исключает e
 В этой реализации “most recent rate edit” означает самый поздний по времени создания редактирования, то есть `created_at DESC`.
 
 ```sql
-SELECT e.*
-FROM rate_events e
-JOIN payslips p
-  ON p.id = :payslip_id
-JOIN payslip_lines pl
-  ON pl.payslip_id = p.id
- AND pl.payment_category_id = e.payment_category_id
-WHERE e.employee_id = p.employee_id
-  AND e.effective_at <= p.date
-  AND e.created_at > p.created_at
-  AND NOT EXISTS (
-    SELECT 1
-    FROM payslip_dismissed_rate_events d
-    WHERE d.payslip_id = p.id
-      AND d.rate_event_id = e.id
-  )
-ORDER BY e.created_at DESC, e.effective_at DESC, e.id DESC
+SELECT re.*
+FROM rate_event_payslips rep
+JOIN rate_events re
+  ON re.id = rep.rate_event_id
+WHERE rep.payslip_id = :payslip_id
+  AND rep.is_dismissed = 0
+ORDER BY re.created_at DESC, re.effective_at DESC, re.id DESC
 LIMIT 1;
 ```
 
-Если продукт захочет трактовать “most recent” как “latest effective date”, нужно поменять порядок сортировки на:
+Если продукт захочет трактовать "most recent" как "latest effective date", нужно поменять порядок сортировки на:
 
 ```sql
-ORDER BY e.effective_at DESC, e.created_at DESC, e.id DESC
+ORDER BY re.effective_at DESC, re.created_at DESC, re.id DESC
 ```
 
 Но для ТЗ более прямая трактовка — “edit made after payslip was created”, поэтому default choice: `created_at DESC`.
 
-### Вставить dismissal
+### Dismissal
 
 ```sql
-INSERT INTO payslip_dismissed_rate_events (
-  payslip_id,
-  rate_event_id,
-  dismissed_at,
-  dismissed_by_user_id
-)
-VALUES (
-  :payslip_id,
-  :rate_event_id,
-  strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
-  1
-);
+UPDATE rate_event_payslips
+SET is_dismissed = 1,
+    dismissed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+    dismissed_by_user_id = 1
+WHERE rate_event_id = :rate_event_id
+  AND payslip_id = :payslip_id
+  AND is_dismissed = 0;
 ```
 
-После этого current total пересчитывается. Если был dismissed более поздний event, предыдущий event снова может стать применимым.
+После этого current total пересчитывается автоматически — следующий non-dismissed event по `effective_at DESC` становится текущей ставкой.
 
 ---
 
@@ -528,8 +510,8 @@ VALUES (
 Базовый вариант:
 
 - rate resolution: `O(log n)` для одного employee/category/date благодаря индексу;
-- payslip list: пересчёт по строкам payslip;
-- dismissal: поиск только среди rate events, которые могут влиять на payslip.
+- payslip list: пересчёт по строкам payslip через связку rate_event_payslips (один JOIN вместо сканирования всех rate events);
+- dismissal: UPDATE одной строки в rate_event_payslips.
 
 Индексы в `initial.sql` покрывают основные запросы:
 
@@ -538,8 +520,7 @@ rate_events(employee_id, payment_category_id, effective_at DESC, created_at DESC
 rate_events(created_at, employee_id, payment_category_id, effective_at DESC)
 payslips(created_at)
 payslip_lines(payslip_id)
-payslip_dismissed_rate_events(payslip_id, rate_event_id)
-payslip_dismissed_rate_events(rate_event_id, payslip_id)
+rate_event_payslips(payslip_id)
 ```
 
 Если payslips станет очень много, следующим шагом можно добавить materialized projection:
@@ -689,6 +670,12 @@ rate_amount_cents
 - minor: rename db entities names from plural to singular (as more traditional approach)
 - refactor: add react-router
 - refactor: use library for dates human-readable formatting
+- improve: after modifying rates refresh only affected payslips 
+- improve: time-travel for payslips too. Note: I made conclusion this didn't required because in chapter "Effective date selector (“time travel”)" its affect was described only for the rates but not payslips
+- security issue: deny to dismiss *not* the most recent retroactive change (experienced user can make it)
+- improve: don't create retroactive changes that would be overloaded by another retroactive changes (for example closer to payslip date)
+- 
+- в список retroactive rate changes попадают все post-creation rate events, даже если они не влияют на текущую ставку (например, перекрыты более поздним edit'ом). Можно заменить on-the-fly пересчёт на материализованную связку rate_event_payslips, заполняемую при создании rate event — это упростит read-path и уберёт некорректную фильтрацию
 
 ---
 

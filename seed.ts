@@ -16,14 +16,10 @@ const db = drizzle(sqlite, { schema });
 async function seed() {
   console.log("Starting seed...");
 
-  // Check if already seeded
-  const existingUser = await db
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.id, 1))
-    .limit(1);
+  // Check if already seeded (check payslips as the last inserted entity)
+  const existingPayslips = await db.select().from(schema.payslips).limit(1);
 
-  if (existingUser.length > 0) {
+  if (existingPayslips.length > 0) {
     console.log("Database already seeded. Skipping...");
     return;
   }
@@ -94,6 +90,16 @@ async function seed() {
       createdByUserId: 1,
       note: "Alex Brown hourly baseline: 900 cents/hour = $9/hour",
     },
+    {
+      id: 5,
+      employeeId: 1,
+      paymentCategoryId: 1,
+      effectiveDate: "2026-06-10",
+      rateCents: 1300,
+      createdAt: "2026-06-13T09:00:00Z",
+      createdByUserId: 1,
+      note: "John Doe hourly rate change: 1300 cents/hour = $13/hour",
+    },
   ]);
   console.log("✓ Inserted rate events");
 
@@ -103,9 +109,9 @@ async function seed() {
       id: 1,
       userId: 1,
       employeeId: 1,
-      date: "2026-06-15",
+      date: "2026-06-10",
       originalTotalCents: 48000,
-      createdAt: "2026-06-15T10:00:00Z",
+      createdAt: "2026-06-10T10:00:00Z",
     },
     {
       id: 2,
@@ -130,6 +136,14 @@ async function seed() {
       date: "2026-06-15",
       originalTotalCents: 36000,
       createdAt: "2026-06-15T10:00:00Z",
+    },
+    {
+      id: 5,
+      userId: 1,
+      employeeId: 1,
+      date: "2026-06-30",
+      originalTotalCents: 52000,
+      createdAt: "2026-06-30T10:00:00Z",
     },
   ]);
   console.log("✓ Inserted payslips");
@@ -175,6 +189,14 @@ async function seed() {
       units: 40,
       rateAtCreationCents: 900,
       originalTotalCents: 36000,
+    },
+    {
+      id: 6,
+      payslipId: 5,
+      paymentCategoryId: 1,
+      units: 40,
+      rateAtCreationCents: 1300,
+      originalTotalCents: 52000,
     },
   ]);
   console.log("✓ Inserted payslip line items");
