@@ -177,16 +177,23 @@ export async function getPayslipsForEmployee(
       }
 
       // All active links are retroactive edits (by definition of the link table)
-      const retroactiveRateEdits: RetroactiveRateEdit[] = activeLinks.map(
-        (link) => ({
+      // Sort most-recent first so the UI can show the dismissible one at the top
+      const retroactiveRateEdits: RetroactiveRateEdit[] = activeLinks
+        .sort((a, b) => {
+          const cmp = b.effectiveDate.localeCompare(a.effectiveDate);
+          if (cmp !== 0) return cmp;
+          const cmp2 = b.createdAt.localeCompare(a.createdAt);
+          if (cmp2 !== 0) return cmp2;
+          return b.rateEventId - a.rateEventId;
+        })
+        .map((link) => ({
           rateEventId: link.rateEventId,
           paymentCategoryId: link.paymentCategoryId,
           paymentCategoryName: link.paymentCategoryName,
           effectiveDate: link.effectiveDate,
           rateCents: link.rateCents,
           createdAt: link.createdAt,
-        }),
-      );
+        }));
 
       return {
         ...payslip,
@@ -322,16 +329,23 @@ export async function getPayslipDetail(
     }
 
     // All active links are retroactive edits (by definition of the link table)
-    const retroactiveRateEdits: RetroactiveRateEdit[] = activeLinks.map(
-      (link) => ({
+    // Sort most-recent first so the UI can show the dismissible one at the top
+    const retroactiveRateEdits: RetroactiveRateEdit[] = activeLinks
+      .sort((a, b) => {
+        const cmp = b.effectiveDate.localeCompare(a.effectiveDate);
+        if (cmp !== 0) return cmp;
+        const cmp2 = b.createdAt.localeCompare(a.createdAt);
+        if (cmp2 !== 0) return cmp2;
+        return b.rateEventId - a.rateEventId;
+      })
+      .map((link) => ({
         rateEventId: link.rateEventId,
         paymentCategoryId: link.paymentCategoryId,
         paymentCategoryName: link.paymentCategoryName,
         effectiveDate: link.effectiveDate,
         rateCents: link.rateCents,
         createdAt: link.createdAt,
-      }),
-    );
+      }));
 
     return {
       ...payslipData,
@@ -347,13 +361,20 @@ export async function getPayslipDetail(
 }
 
 /**
- * Dismiss a retroactive rate edit for a specific payslip.
- * Sets is_dismissed = true on the link table row.
+ * Dismiss the most recent retroactive rate edit for a specific payslip.
+ * Per requirements: "let the user dismiss the most recent rate edit affecting it.
+ * If multiple rate edits affect the payslip, dismiss removes them one at a time,
+ * most-recent first."
+ *
+ * "Most recent" = latest effectiveDate, with createdAt DESC and rateEventId DESC
+ * as tiebreakers (matching the existing rate resolution sort order).
+ *
+ * Returns true if a rate edit was dismissed, false if nothing to dismiss.
  */
 export async function dismissRateEditForPayslip(
   payslipId: number,
   rateEditId: number,
-): Promise<void> {
+): Promise<boolean> {
   const parsed = dismissRateEditForPayslipSchema.safeParse({
     payslipId,
     rateEditId,
@@ -363,10 +384,49 @@ export async function dismissRateEditForPayslip(
     throw new Error("Invalid dismissal data: " + parsed.error.message);
   }
 
+  // Fetch all non-dismissed links for this payslip, ordered most-recent first
+  const activeLinks = await db
+    .select({
+      rateEventId: schema.rateEventPayslips.rateEventId,
+      isDismissed: schema.rateEventPayslips.isDismissed,
+      effectiveDate: schema.rateEdits.effectiveDate,
+      createdAt: schema.rateEdits.createdAt,
+    })
+    .from(schema.rateEventPayslips)
+    .innerJoin(
+      schema.rateEdits,
+      eq(schema.rateEventPayslips.rateEventId, schema.rateEdits.id),
+    )
+    .where(
+      and(
+        eq(schema.rateEventPayslips.payslipId, payslipId),
+        eq(schema.rateEventPayslips.isDismissed, false),
+      ),
+    )
+    .orderBy(
+      desc(schema.rateEdits.effectiveDate),
+      desc(schema.rateEdits.createdAt),
+      desc(schema.rateEdits.id),
+    );
+
+  if (activeLinks.length === 0) {
+    return false; // Nothing to dismiss
+  }
+
+  // The most-recent rate edit is the first one in the sorted list
+  const mostRecent = activeLinks[0];
+
+  // Only allow dismissing the most-recent rate edit
+  if (mostRecent.rateEventId !== rateEditId) {
+    throw new Error(
+      "Can only dismiss the most recent retroactive rate edit for this payslip",
+    );
+  }
+
   const now = new Date().toISOString();
 
   // Update the link table row to dismissed
-  const result = await db
+  await db
     .update(schema.rateEventPayslips)
     .set({
       isDismissed: true,
@@ -381,8 +441,6 @@ export async function dismissRateEditForPayslip(
       ),
     );
 
-  // If no row was updated, the link doesn't exist or was already dismissed
-  // We silently return (idempotent behavior)
-
   await revalidatePath("/dashboard");
+  return true;
 }

@@ -381,7 +381,7 @@ export function Payslips({ selectedEmployee, refreshKey = 0 }: PayslipsProps) {
                     )}
                   </div>
 
-                  {/* Retroactive Rate Edits Section */}
+                  {/* Retroactive Rate Edits Section — only the most recent is dismissible */}
                   {selectedPayslip.isRetroactivelyChanged &&
                     selectedPayslip.retroactiveRateEdits.length > 0 && (
                       <div>
@@ -389,34 +389,45 @@ export function Payslips({ selectedEmployee, refreshKey = 0 }: PayslipsProps) {
                           Retroactive Rate Changes
                         </h4>
                         <div className="space-y-2">
-                          {selectedPayslip.retroactiveRateEdits.map((edit) => (
-                            <div
-                              key={edit.rateEventId}
-                              className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 border border-amber-200 dark:border-amber-800 flex justify-between items-center"
-                            >
-                              <div>
-                                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                                  {edit.paymentCategoryName}
-                                </p>
-                                <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                                  Effective {formatDate(edit.effectiveDate)} •{" "}
-                                  {formatCurrency(edit.rateCents)}/unit
-                                </p>
-                              </div>
-                              <button
-                                onClick={() =>
-                                  handleDismissRateEdit(
-                                    selectedPayslip.id,
-                                    edit.rateEventId,
-                                  )
-                                }
-                                className="text-xs bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-700 dark:text-zinc-300 px-3 py-1 rounded transition-colors"
+                          {selectedPayslip.retroactiveRateEdits.map(
+                            (edit, index) => (
+                              <div
+                                key={edit.rateEventId}
+                                className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 border border-amber-200 dark:border-amber-800 flex justify-between items-center"
                               >
-                                Dismiss
-                              </button>
-                            </div>
-                          ))}
+                                <div>
+                                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                                    {edit.paymentCategoryName}
+                                  </p>
+                                  <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                                    Effective {formatDate(edit.effectiveDate)} •{" "}
+                                    {formatCurrency(edit.rateCents)}/unit
+                                  </p>
+                                </div>
+                                {index === 0 && (
+                                  <button
+                                    onClick={() =>
+                                      handleDismissRateEdit(
+                                        selectedPayslip.id,
+                                        edit.rateEventId,
+                                      )
+                                    }
+                                    className="text-xs bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-700 dark:text-zinc-300 px-3 py-1 rounded transition-colors"
+                                  >
+                                    Dismiss
+                                  </button>
+                                )}
+                              </div>
+                            ),
+                          )}
                         </div>
+                        {selectedPayslip.retroactiveRateEdits.length > 1 && (
+                          <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                            {selectedPayslip.retroactiveRateEdits.length - 1}{" "}
+                            older change(s) will become dismissable after the
+                            most recent one is dismissed.
+                          </p>
+                        )}
                       </div>
                     )}
 

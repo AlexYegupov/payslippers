@@ -676,6 +676,9 @@ rate_amount_cents
 - improve: don't create retroactive changes that would be overloaded by another retroactive changes (for example closer to payslip date)
 - 
 - в список retroactive rate changes попадают все post-creation rate events, даже если они не влияют на текущую ставку (например, перекрыты более поздним edit'ом). Можно заменить on-the-fly пересчёт на материализованную связку rate_event_payslips, заполняемую при создании rate event — это упростит read-path и уберёт некорректную фильтрацию
+- could be make more precise: rate_events_payslips link table could be made for rate events and payslips, to track which events affect which payslips
+- improve checking if rate edit affect on payslip: except effective date also consider payment categories
+- refactor: dismissRateEditForPayslip(payslipId, rateEditId) actually doesn't requires rateEditId (ir should just detect most recent rate edit for payslip on server)
 
 ---
 
