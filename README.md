@@ -2,7 +2,7 @@
 
 A payroll workbench for managing employee rates, creating time-aware payslips, and detecting retroactive changes when rates are edited.
 
-Built with **Next.js 16**, **TypeScript**, **Drizzle ORM**, **better-sqlite3**, **tRPC-style server actions**, and **Tailwind CSS 4**.
+Built with **Next.js 16**, **TypeScript**, **Drizzle ORM**, **better-sqlite3**, **tRPC-imirate style server actions**, and **Tailwind CSS 4**.
 
 ---
 
@@ -180,15 +180,14 @@ All monetary values are stored as integers in cents (`rate_amount_cents`, `total
 ### Installation
 
 ```bash
-cd apps/web
 npm install
 ```
 
 ### Environment
 
-The app reads `DATABASE_URL` from your environment (via `.env`). It defaults to `file:local.db` if not set. To use the default, no `.env` file is needed — just make sure the working directory is `apps/web`.
+The app reads `DATABASE_URL` from your environment (via `.env`). It defaults to `file:local.db` if not set. To use the default, no `.env` file is needed .
 
-To use a custom path, create `.env`:
+To use a custom path, create & fill the `.env`:
 
 ```bash
 DATABASE_URL=file:local.db
@@ -196,14 +195,8 @@ DATABASE_URL=file:local.db
 
 ### Database Setup
 
-The app uses a local SQLite database (`local.db`). To create the schema and seed initial data:
+The app uses a local SQLite database (`local.db`). To create the database with seed initial data use:
 
-```bash
-# Create the schema and seed in one step
-npm run db:setup
-```
-
-To start fresh (deletes existing DB, then creates schema and seeds):
 
 ```bash
 npm run db:recreate
