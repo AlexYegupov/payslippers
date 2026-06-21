@@ -2,9 +2,13 @@
 
 import { db } from "@/server/db";
 import * as schema from "@/server/db/schema";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, lte } from "drizzle-orm";
+import {
+  createPayslipSchema,
+  dismissRateEditForPayslipSchema,
+} from "@/server/db/schema";
 import { revalidatePath } from "next/cache";
-import { dismissRateEditForPayslipSchema } from "@/server/db/schema";
+import { z } from "zod";
 
 export interface PayslipLineItem {
   id: number;
@@ -443,4 +447,97 @@ export async function dismissRateEditForPayslip(
 
   await revalidatePath("/dashboard");
   return true;
+}
+
+export type CreatePayslipInput = z.infer<typeof createPayslipSchema>;
+
+export async function createPayslip(input: CreatePayslipInput) {
+  const parsed = createPayslipSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new Error("Invalid payslip data: " + parsed.error.message);
+  }
+
+  const now = new Date().toISOString();
+
+  // Resolve the current rate for each line item
+  const resolvedLineItems = await Promise.all(
+    input.lineItems.map(
+      async (item: { paymentCategoryId: number; units: number }) => {
+        // Find the most recent rate for this employee+category as of the payslip date
+        const [rate] = await db
+          .select({ rateCents: schema.rateEdits.rateCents })
+          .from(schema.rateEdits)
+          .where(
+            and(
+              eq(schema.rateEdits.employeeId, input.employeeId),
+              eq(schema.rateEdits.paymentCategoryId, item.paymentCategoryId),
+              lte(schema.rateEdits.effectiveDate, input.date),
+            ),
+          )
+          .orderBy(
+            desc(schema.rateEdits.effectiveDate),
+            desc(schema.rateEdits.createdAt),
+            desc(schema.rateEdits.id),
+          )
+          .limit(1);
+
+        if (!rate) {
+          throw new Error(
+            `No rate found for payment category ${item.paymentCategoryId} on date ${input.date}`,
+          );
+        }
+
+        return {
+          paymentCategoryId: item.paymentCategoryId,
+          units: item.units,
+          rateAtCreationCents: rate.rateCents,
+          originalTotalCents: item.units * rate.rateCents,
+        };
+      },
+    ),
+  );
+
+  const originalTotalCents = resolvedLineItems.reduce(
+    (sum: number, item: { originalTotalCents: number }) =>
+      sum + item.originalTotalCents,
+    0,
+  );
+
+  // better-sqlite3 requires synchronous transactions
+  const payslip = db.transaction((tx) => {
+    const result = tx
+      .insert(schema.payslips)
+      .values({
+        userId: 1, // Fixed user for this assignment
+        employeeId: input.employeeId,
+        date: input.date,
+        originalTotalCents,
+        createdAt: now,
+      })
+      .returning()
+      .get();
+
+    // Insert line items
+    for (const item of resolvedLineItems) {
+      tx.insert(schema.payslipLineItems)
+        .values({
+          payslipId: result.id,
+          paymentCategoryId: item.paymentCategoryId,
+          units: item.units,
+          rateAtCreationCents: item.rateAtCreationCents,
+          originalTotalCents: item.originalTotalCents,
+        })
+        .run();
+    }
+
+    return result;
+  });
+
+  try {
+    await revalidatePath("/dashboard");
+  } catch {
+    // revalidatePath may fail outside of Next.js request context (e.g. tests)
+  }
+
+  return payslip;
 }

@@ -679,6 +679,10 @@ rate_amount_cents
 - could be make more precise: rate_events_payslips link table could be made for rate events and payslips, to track which events affect which payslips
 - improve checking if rate edit affect on payslip: except effective date also consider payment categories
 - refactor: dismissRateEditForPayslip(payslipId, rateEditId) actually doesn't requires rateEditId (ir should just detect most recent rate edit for payslip on server)
+- refactor: good css styling without duplicate etc
+- refactor: DRY for trivial cases in code (like functions  formatRelativeTime, formatRelativeTime, getTodayString etc)
+- improve: use tRPC for server-client communication
+- improve: use db user everywhere instead of consts
 
 ---
 

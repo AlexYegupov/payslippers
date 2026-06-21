@@ -24,6 +24,15 @@ export interface RateWithCategory {
   } | null;
 }
 
+export async function getPaymentCategories() {
+  try {
+    return await db.select().from(schema.paymentCategories);
+  } catch (error) {
+    console.error("Error fetching payment categories:", error);
+    throw new Error("Failed to fetch payment categories");
+  }
+}
+
 export async function getRatesForEmployee(
   employeeId: number,
   effectiveDate: string,

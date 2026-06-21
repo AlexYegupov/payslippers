@@ -1,18 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { type Employee } from "./EmployeeSelector";
 import {
   getPayslipsForEmployee,
   getPayslipDetail,
   dismissRateEditForPayslip,
+  createPayslip,
   type PayslipWithDetails,
   type PayslipDetail,
 } from "@/server/actions/payslips";
+import { getPaymentCategories } from "@/server/actions/rates";
 
 interface PayslipsProps {
   selectedEmployee: Employee | null;
   refreshKey?: number;
+}
+
+interface PaymentCategory {
+  id: number;
+  name: string;
+  unitLabel: string;
+}
+
+interface LineItem {
+  paymentCategoryId: number | null;
+  units: number;
+}
+
+function getTodayString() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export function Payslips({ selectedEmployee, refreshKey = 0 }: PayslipsProps) {
@@ -27,30 +48,59 @@ export function Payslips({ selectedEmployee, refreshKey = 0 }: PayslipsProps) {
     null,
   );
 
-  useEffect(() => {
+  // Create modal state
+  const [isCreating, setIsCreating] = useState(false);
+  const [createDate, setCreateDate] = useState(getTodayString());
+  const [createLineItems, setCreateLineItems] = useState<LineItem[]>([
+    { paymentCategoryId: null, units: 1 },
+  ]);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createSuccess, setCreateSuccess] = useState(false);
+  const [paymentCategories, setPaymentCategories] = useState<PaymentCategory[]>(
+    [],
+  );
+
+  const fetchPayslips = useCallback(async () => {
     if (!selectedEmployee) {
       setPayslips([]);
       return;
     }
 
-    const fetchPayslips = async () => {
-      setLoading(true);
-      setError(null);
+    setLoading(true);
+    setError(null);
 
+    try {
+      const data = await getPayslipsForEmployee(selectedEmployee.id);
+      setPayslips(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch payslips");
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedEmployee]);
+
+  useEffect(() => {
+    fetchPayslips();
+  }, [fetchPayslips, refreshKey]);
+
+  // Fetch payment categories when the create modal opens
+  useEffect(() => {
+    if (!isCreating) return;
+
+    const fetchCategories = async () => {
       try {
-        const data = await getPayslipsForEmployee(selectedEmployee.id);
-        setPayslips(data);
+        const categories = await getPaymentCategories();
+        setPaymentCategories(categories);
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch payslips",
+        setCreateError(
+          err instanceof Error ? err.message : "Failed to fetch categories",
         );
-      } finally {
-        setLoading(false);
       }
     };
 
-    fetchPayslips();
-  }, [selectedEmployee, refreshKey]);
+    fetchCategories();
+  }, [isCreating]);
 
   const formatCurrency = (cents: number) => {
     return `$${(cents / 100).toFixed(2)}`;
@@ -122,6 +172,104 @@ export function Payslips({ selectedEmployee, refreshKey = 0 }: PayslipsProps) {
     }
   };
 
+  // --- Create modal handlers ---
+
+  const handleOpenCreate = () => {
+    setCreateDate(getTodayString());
+    setCreateLineItems([{ paymentCategoryId: null, units: 1 }]);
+    setCreateError(null);
+    setCreateSuccess(false);
+    setCreateLoading(false);
+    setIsCreating(true);
+  };
+
+  const handleCloseCreate = () => {
+    setIsCreating(false);
+  };
+
+  const handleAddLineItem = () => {
+    setCreateLineItems((prev) => [
+      ...prev,
+      { paymentCategoryId: null, units: 1 },
+    ]);
+  };
+
+  const handleRemoveLineItem = (index: number) => {
+    setCreateLineItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleLineItemChange = (
+    index: number,
+    field: keyof LineItem,
+    value: number | null,
+  ) => {
+    setCreateLineItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)),
+    );
+  };
+
+  const handleCreateSubmit = async () => {
+    if (!selectedEmployee) return;
+
+    setCreateError(null);
+    setCreateSuccess(false);
+
+    // Client-side validation
+    const validLineItems = createLineItems.filter(
+      (item) => item.paymentCategoryId !== null,
+    );
+
+    if (validLineItems.length === 0) {
+      setCreateError("At least one line item with a category is required");
+      return;
+    }
+
+    const categoryIds = validLineItems.map((item) => item.paymentCategoryId);
+    if (new Set(categoryIds).size !== categoryIds.length) {
+      setCreateError("Each payment category can only appear once");
+      return;
+    }
+
+    if (
+      validLineItems.some(
+        (item) => item.units <= 0 || !Number.isInteger(item.units),
+      )
+    ) {
+      setCreateError("Units must be a positive whole number");
+      return;
+    }
+
+    setCreateLoading(true);
+
+    try {
+      await createPayslip({
+        employeeId: selectedEmployee.id,
+        date: createDate,
+        lineItems: validLineItems.map((item) => ({
+          paymentCategoryId: item.paymentCategoryId!,
+          units: item.units,
+        })),
+      });
+
+      setCreateSuccess(true);
+
+      // Refresh the list
+      const data = await getPayslipsForEmployee(selectedEmployee.id);
+      setPayslips(data);
+
+      // Auto-close after a brief delay
+      setTimeout(() => {
+        setIsCreating(false);
+      }, 800);
+    } catch (err) {
+      setCreateError(
+        err instanceof Error ? err.message : "Failed to create payslip",
+      );
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
   if (!selectedEmployee) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -176,6 +324,25 @@ export function Payslips({ selectedEmployee, refreshKey = 0 }: PayslipsProps) {
               Historical payslips for {selectedEmployee.name}
             </p>
           </div>
+          <button
+            onClick={handleOpenCreate}
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors text-sm"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+            Create Payslip
+          </button>
         </div>
 
         {payslips.length === 0 ? (
@@ -497,6 +664,204 @@ export function Payslips({ selectedEmployee, refreshKey = 0 }: PayslipsProps) {
                 className="w-full bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-zinc-800 dark:text-zinc-200 font-medium py-2 px-4 rounded-lg transition-colors"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Payslip Modal */}
+      {isCreating && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl max-w-lg w-full border border-zinc-200 dark:border-zinc-800 max-h-[80vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                Create Payslip
+              </h3>
+              <button
+                onClick={handleCloseCreate}
+                className="text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              {/* Success message */}
+              {createSuccess && (
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                  <p className="text-sm text-green-800 dark:text-green-200">
+                    ✓ Payslip created successfully!
+                  </p>
+                </div>
+              )}
+
+              {/* Error message */}
+              {createError && !createSuccess && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                  <p className="text-sm text-red-800 dark:text-red-200">
+                    {createError}
+                  </p>
+                </div>
+              )}
+
+              {/* Date input */}
+              <div>
+                <label
+                  htmlFor="create-date"
+                  className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1"
+                >
+                  Date
+                </label>
+                <input
+                  id="create-date"
+                  type="date"
+                  value={createDate}
+                  onChange={(e) => setCreateDate(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Line items */}
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                  Line Items
+                </label>
+                <div className="space-y-3">
+                  {createLineItems.map((item, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <select
+                        value={item.paymentCategoryId ?? ""}
+                        onChange={(e) =>
+                          handleLineItemChange(
+                            index,
+                            "paymentCategoryId",
+                            e.target.value ? Number(e.target.value) : null,
+                          )
+                        }
+                        className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Select category...</option>
+                        {paymentCategories.map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.name} ({cat.unitLabel})
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={item.units}
+                        onChange={(e) =>
+                          handleLineItemChange(
+                            index,
+                            "units",
+                            Math.max(
+                              1,
+                              Math.floor(Number(e.target.value) || 1),
+                            ),
+                          )
+                        }
+                        className="w-20 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Units"
+                      />
+                      <button
+                        onClick={() => handleRemoveLineItem(index)}
+                        disabled={createLineItems.length <= 1}
+                        className="p-2 text-zinc-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        title="Remove line item"
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={handleAddLineItem}
+                  className="mt-3 inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Add Line Item
+                </button>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50 flex gap-3">
+              <button
+                onClick={handleCloseCreate}
+                disabled={createLoading}
+                className="flex-1 bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-zinc-800 dark:text-zinc-200 font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateSubmit}
+                disabled={createLoading || createSuccess}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {createLoading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <svg
+                      className="animate-spin h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    Creating...
+                  </span>
+                ) : (
+                  "Create Payslip"
+                )}
               </button>
             </div>
           </div>
