@@ -18,6 +18,8 @@ export interface PayslipLineItem {
   rateAtCreationCents: number;
   originalTotalCents: number;
   paymentCategoryId?: number;
+  currentRateCents: number;
+  currentTotalCents: number;
 }
 
 export interface PayslipWithDetails {
@@ -122,6 +124,8 @@ export async function getPayslipsForEmployee(
         units: item.units,
         rateAtCreationCents: item.rateAtCreationCents,
         originalTotalCents: item.originalTotalCents,
+        currentRateCents: item.rateAtCreationCents,
+        currentTotalCents: item.originalTotalCents,
       });
 
       return acc;
@@ -171,14 +175,20 @@ export async function getPayslipsForEmployee(
 
       // Compute current total using current rates from the link table
       let currentTotalCents = 0;
-      for (const item of items) {
+      const resolvedItems = items.map((item) => {
         const currentRate = resolveCurrentRateFromLinks(
           activeLinks,
           item.paymentCategoryId as number,
         );
         const rateToUse = currentRate ?? item.rateAtCreationCents;
-        currentTotalCents += item.units * rateToUse;
-      }
+        const itemCurrentTotal = item.units * rateToUse;
+        currentTotalCents += itemCurrentTotal;
+        return {
+          ...item,
+          currentRateCents: rateToUse,
+          currentTotalCents: itemCurrentTotal,
+        };
+      });
 
       // All active links are retroactive edits (by definition of the link table)
       // Sort by createdAt DESC (most-recent first) per requirements, then by
@@ -202,7 +212,7 @@ export async function getPayslipsForEmployee(
 
       return {
         ...payslip,
-        lineItems: items,
+        lineItems: resolvedItems,
         currentTotalCents,
         isRetroactivelyChanged: retroactiveRateEdits.length > 0,
         retroactiveRateEdits,
@@ -322,16 +332,22 @@ export async function getPayslipDetail(
     // Non-dismissed links
     const activeLinks = rateEventLinks.filter((link) => !link.isDismissed);
 
-    // Compute current total
+    // Compute current total and resolve per-item current rates
     let currentTotalCents = 0;
-    for (const item of lineItems) {
+    const resolvedLineItems = lineItems.map((item) => {
       const currentRate = resolveCurrentRateFromLinks(
         activeLinks,
         item.paymentCategoryId as number,
       );
       const rateToUse = currentRate ?? item.rateAtCreationCents;
-      currentTotalCents += item.units * rateToUse;
-    }
+      const itemCurrentTotal = item.units * rateToUse;
+      currentTotalCents += itemCurrentTotal;
+      return {
+        ...item,
+        currentRateCents: rateToUse,
+        currentTotalCents: itemCurrentTotal,
+      };
+    });
 
     // All active links are retroactive edits (by definition of the link table)
     // Sort by createdAt DESC (most-recent first) per requirements, then by
@@ -355,7 +371,7 @@ export async function getPayslipDetail(
 
     return {
       ...payslipData,
-      lineItems,
+      lineItems: resolvedLineItems,
       currentTotalCents,
       isRetroactivelyChanged: retroactiveRateEdits.length > 0,
       retroactiveRateEdits,

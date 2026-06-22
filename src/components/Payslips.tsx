@@ -396,16 +396,13 @@ export function Payslips({
                     Date
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                    Original Total
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                    Current Total
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                    Created
+                    Total
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
                     Line Items
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                    Created
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
                     Actions
@@ -438,46 +435,82 @@ export function Payslips({
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-zinc-900 dark:text-zinc-50 font-mono">
-                        {formatCurrency(payslip.originalTotalCents)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div
-                        className={`text-sm font-mono font-medium ${
-                          payslip.isRetroactivelyChanged
-                            ? "text-amber-700 dark:text-amber-400"
-                            : "text-zinc-900 dark:text-zinc-50"
-                        }`}
-                      >
-                        {formatCurrency(payslip.currentTotalCents)}
-                        {payslip.isRetroactivelyChanged && (
-                          <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">
-                            ⚠
+                      <div className="text-sm font-mono">
+                        {payslip.isRetroactivelyChanged ? (
+                          <>
+                            <del className="text-zinc-500 dark:text-zinc-400">
+                              {formatCurrency(payslip.originalTotalCents)}
+                            </del>
+                            <span className="text-zinc-500 dark:text-zinc-400 mx-1">
+                              →
+                            </span>
+                            <ins className="text-amber-700 dark:text-amber-400">
+                              {formatCurrency(payslip.currentTotalCents)}
+                            </ins>
+                          </>
+                        ) : (
+                          <span className="text-zinc-900 dark:text-zinc-50">
+                            {formatCurrency(payslip.originalTotalCents)}
                           </span>
                         )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="space-y-1">
+                        {payslip.lineItems.map((item) => {
+                          const hasRetro =
+                            item.currentRateCents !== item.rateAtCreationCents;
+                          return (
+                            <div
+                              key={item.id}
+                              className="text-sm text-zinc-700 dark:text-zinc-300"
+                            >
+                              <div className="font-medium">
+                                {item.paymentCategoryName}
+                              </div>
+                              <div>
+                                {item.units} {item.unitLabel} ×{" "}
+                                {hasRetro ? (
+                                  <span className="text-zinc-500 dark:text-zinc-400">
+                                    <del>
+                                      {formatCurrency(item.rateAtCreationCents)}
+                                    </del>
+                                  </span>
+                                ) : (
+                                  formatCurrency(item.rateAtCreationCents)
+                                )}
+                                ={" "}
+                                {hasRetro ? (
+                                  <span className="text-zinc-500 dark:text-zinc-400">
+                                    <del>
+                                      {formatCurrency(item.originalTotalCents)}
+                                    </del>
+                                  </span>
+                                ) : (
+                                  formatCurrency(item.originalTotalCents)
+                                )}
+                                {hasRetro && (
+                                  <span className="text-amber-600 dark:text-amber-400">
+                                    {" → "}
+                                    {item.units} ×{" "}
+                                    <ins>
+                                      {formatCurrency(item.currentRateCents)}
+                                    </ins>
+                                    ={" "}
+                                    <ins>
+                                      {formatCurrency(item.currentTotalCents)}
+                                    </ins>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-zinc-600 dark:text-zinc-400">
                         {formatRelativeTime(payslip.createdAt)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-1">
-                        {payslip.lineItems.map((item) => (
-                          <div
-                            key={item.id}
-                            className="text-sm text-zinc-700 dark:text-zinc-300"
-                          >
-                            <span className="font-medium">
-                              {item.paymentCategoryName}
-                            </span>
-                            : {item.units} {item.unitLabel} ×{" "}
-                            {formatCurrency(item.rateAtCreationCents)} ={" "}
-                            {formatCurrency(item.originalTotalCents)}
-                          </div>
-                        ))}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -647,34 +680,61 @@ export function Payslips({
                     <h4 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
                       Line Items
                     </h4>
-                    <div className="space-y-3">
-                      {selectedPayslip.lineItems.map((item) => (
-                        <div
-                          key={item.id}
-                          className="bg-zinc-50 dark:bg-zinc-800 rounded-lg p-4 border border-zinc-200 dark:border-zinc-700"
-                        >
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                          <th className="text-left py-2 pr-4 font-medium text-zinc-600 dark:text-zinc-400">
+                            Category
+                          </th>
+                          <th className="text-left py-2 pl-4 font-medium text-zinc-600 dark:text-zinc-400">
+                            Value
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                        {selectedPayslip.lineItems.map((item) => {
+                          const hasRetroChange =
+                            item.currentRateCents !== item.rateAtCreationCents;
+                          return (
+                            <tr key={item.id}>
+                              <td className="py-3 pr-4 font-medium text-zinc-900 dark:text-zinc-50 align-top">
                                 {item.paymentCategoryName}
-                              </p>
-                              <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
-                                {item.unitLabel}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                                {formatCurrency(item.originalTotalCents)}
-                              </p>
-                              <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
-                                {item.units} ×{" "}
-                                {formatCurrency(item.rateAtCreationCents)}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                              </td>
+                              <td className="py-3 pl-4">
+                                <div className="text-amber-700 dark:text-amber-400">
+                                  <span className="font-mono inline-block w-24 text-right">
+                                    {item.units}
+                                  </span>{" "}
+                                  hour(s) ×{" "}
+                                  <ins className="font-mono inline-block w-24 text-right">
+                                    {formatCurrency(item.currentRateCents)}
+                                  </ins>{" "}
+                                  ={" "}
+                                  <ins className="font-mono inline-block w-24 text-right">
+                                    {formatCurrency(item.currentTotalCents)}
+                                  </ins>
+                                </div>
+                                {hasRetroChange && (
+                                  <div className="text-zinc-500 dark:text-zinc-400 mt-1">
+                                    <span className="font-mono inline-block w-24 text-right">
+                                      {item.units}
+                                    </span>{" "}
+                                    hour(s) ×{" "}
+                                    <del className="font-mono inline-block w-24 text-right">
+                                      {formatCurrency(item.rateAtCreationCents)}
+                                    </del>{" "}
+                                    ={" "}
+                                    <del className="font-mono inline-block w-24 text-right">
+                                      {formatCurrency(item.originalTotalCents)}
+                                    </del>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
 
                   {/* Additional Info Section */}
