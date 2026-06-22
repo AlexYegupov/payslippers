@@ -181,12 +181,13 @@ export async function getPayslipsForEmployee(
       }
 
       // All active links are retroactive edits (by definition of the link table)
-      // Sort most-recent first so the UI can show the dismissible one at the top
+      // Sort by createdAt DESC (most-recent first) per requirements, then by
+      // effectiveDate DESC and rateEventId DESC as tiebreakers.
       const retroactiveRateEdits: RetroactiveRateEdit[] = activeLinks
         .sort((a, b) => {
-          const cmp = b.effectiveDate.localeCompare(a.effectiveDate);
+          const cmp = b.createdAt.localeCompare(a.createdAt);
           if (cmp !== 0) return cmp;
-          const cmp2 = b.createdAt.localeCompare(a.createdAt);
+          const cmp2 = b.effectiveDate.localeCompare(a.effectiveDate);
           if (cmp2 !== 0) return cmp2;
           return b.rateEventId - a.rateEventId;
         })
@@ -333,12 +334,13 @@ export async function getPayslipDetail(
     }
 
     // All active links are retroactive edits (by definition of the link table)
-    // Sort most-recent first so the UI can show the dismissible one at the top
+    // Sort by createdAt DESC (most-recent first) per requirements, then by
+    // effectiveDate DESC and rateEventId DESC as tiebreakers.
     const retroactiveRateEdits: RetroactiveRateEdit[] = activeLinks
       .sort((a, b) => {
-        const cmp = b.effectiveDate.localeCompare(a.effectiveDate);
+        const cmp = b.createdAt.localeCompare(a.createdAt);
         if (cmp !== 0) return cmp;
-        const cmp2 = b.createdAt.localeCompare(a.createdAt);
+        const cmp2 = b.effectiveDate.localeCompare(a.effectiveDate);
         if (cmp2 !== 0) return cmp2;
         return b.rateEventId - a.rateEventId;
       })
@@ -370,8 +372,8 @@ export async function getPayslipDetail(
  * If multiple rate edits affect the payslip, dismiss removes them one at a time,
  * most-recent first."
  *
- * "Most recent" = latest effectiveDate, with createdAt DESC and rateEventId DESC
- * as tiebreakers (matching the existing rate resolution sort order).
+ * "Most recent" = latest createdAt, with effectiveDate DESC and rateEventId DESC
+ * as tiebreakers (matching the display sort order).
  *
  * Returns true if a rate edit was dismissed, false if nothing to dismiss.
  */
@@ -389,6 +391,7 @@ export async function dismissRateEditForPayslip(
   }
 
   // Fetch all non-dismissed links for this payslip, ordered most-recent first
+  // by createdAt (per requirements), then effectiveDate and id as tiebreakers.
   const activeLinks = await db
     .select({
       rateEventId: schema.rateEventPayslips.rateEventId,
@@ -408,8 +411,8 @@ export async function dismissRateEditForPayslip(
       ),
     )
     .orderBy(
-      desc(schema.rateEdits.effectiveDate),
       desc(schema.rateEdits.createdAt),
+      desc(schema.rateEdits.effectiveDate),
       desc(schema.rateEdits.id),
     );
 

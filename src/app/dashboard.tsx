@@ -29,6 +29,16 @@ export function Dashboard({ employees }: DashboardProps) {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
+      <header className="sticky top-0 z-50 bg-white dark:bg-black border-b border-zinc-200 dark:border-zinc-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center h-16">
+            <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+              Payslippers 🩴🩴
+            </h1>
+          </div>
+        </div>
+      </header>
+
       <EmployeeSelector
         employees={employees}
         selectedEmployee={selectedEmployee}
