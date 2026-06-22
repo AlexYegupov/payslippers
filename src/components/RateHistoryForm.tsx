@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { getRateHistory, type RateWithCategory } from "@/server/actions/rates";
 
 interface RateHistoryFormProps {
@@ -22,7 +22,9 @@ export function RateHistoryForm({
   formatRelativeTime,
   onClose,
 }: RateHistoryFormProps) {
-  const [historyData, setHistoryData] = useState<RateWithCategory["rate"][]>([]);
+  const [historyData, setHistoryData] = useState<RateWithCategory["rate"][]>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,9 +51,29 @@ export function RateHistoryForm({
     fetchHistory();
   }, [employeeId, historyRate.category.id]);
 
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    },
+    [onClose],
+  );
+
+  useEffect(() => {
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl max-w-2xl w-full border border-zinc-200 dark:border-zinc-800 max-h-[80vh] flex flex-col">
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl max-w-2xl w-full border border-zinc-200 dark:border-zinc-800 max-h-[80vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
           <div>
             <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">

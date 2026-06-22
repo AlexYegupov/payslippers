@@ -137,28 +137,6 @@ export function Rates({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Success message toast */}
-      {successMessage && (
-        <div className="mb-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 flex items-center gap-2">
-          <svg
-            className="w-5 h-5 text-green-600 dark:text-green-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M5 13l4 4L19 7"
-            />
-          </svg>
-          <span className="text-sm text-green-800 dark:text-green-200">
-            {successMessage}
-          </span>
-        </div>
-      )}
-
       <div className="relative bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
         {isPending && (
           <div className="absolute top-3 right-3 z-10">
@@ -171,6 +149,26 @@ export function Rates({
               Rates
             </h2>
             <div className="flex items-center gap-3">
+              {successMessage && (
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-1.5 flex items-center gap-2">
+                  <svg
+                    className="w-4 h-4 text-green-600 dark:text-green-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                  <span className="text-xs text-green-800 dark:text-green-200">
+                    {successMessage}
+                  </span>
+                </div>
+              )}
               {(() => {
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
@@ -232,11 +230,15 @@ export function Rates({
                 {rates.map((item) => (
                   <tr
                     key={item.category.id}
-                    className="hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                    className="hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                    onClick={() => handleHistoryClick(item)}
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
                         {item.category.name}
+                        <span className="ml-1 text-zinc-400 dark:text-zinc-500 font-normal">
+                          (id={item.category.id})
+                        </span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -278,15 +280,21 @@ export function Rates({
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">
                         <button
-                          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
-                          onClick={() => handleEditClick(item)}
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditClick(item);
+                          }}
                           title={item.rate ? "Edit rate" : "Add new rate"}
                         >
                           {item.rate ? "Edit" : "Add"}
                         </button>
                         <button
-                          className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-300 transition-colors"
-                          onClick={() => handleHistoryClick(item)}
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleHistoryClick(item);
+                          }}
                           title="View history"
                         >
                           History
