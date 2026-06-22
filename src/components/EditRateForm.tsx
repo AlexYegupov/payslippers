@@ -6,6 +6,7 @@ import {
   getRatesForEmployee,
   type RateWithCategory,
 } from "@/server/actions/rates";
+import { dateToISOString } from "@/lib/format";
 
 interface EditRateFormProps {
   editingRate: RateWithCategory;
@@ -27,7 +28,7 @@ export function EditRateForm({
   onRatesRefresh,
 }: EditRateFormProps) {
   const [effectiveDateStr, setEffectiveDateStr] = useState(
-    effectiveDate.toISOString().split("T")[0],
+    dateToISOString(effectiveDate),
   );
   const [rateCents, setRateCents] = useState(editingRate.rate?.rateCents || 0);
   const [note, setNote] = useState("");
@@ -75,7 +76,7 @@ export function EditRateForm({
         `Rate updated for ${selectedEmployeeName} / ${editingRate.category.name}`,
       );
 
-      const currentEffectiveDateStr = effectiveDate.toISOString().split("T")[0];
+      const currentEffectiveDateStr = dateToISOString(effectiveDate);
       await getRatesForEmployee(employeeId, currentEffectiveDateStr);
       onRatesRefresh();
     } catch (err) {
@@ -123,7 +124,7 @@ export function EditRateForm({
               className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             />
-            {effectiveDateStr !== effectiveDate.toISOString().split("T")[0] && (
+            {effectiveDateStr !== dateToISOString(effectiveDate) && (
               <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
                 This edit will start on {effectiveDateStr} and may change older
                 payslips.

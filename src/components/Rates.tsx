@@ -9,6 +9,12 @@ import {
   getRatesForEmployee,
   type RateWithCategory,
 } from "@/server/actions/rates";
+import {
+  formatCurrency,
+  formatDate,
+  formatRelativeTime,
+  dateToISOString,
+} from "@/lib/format";
 
 interface RatesProps {
   selectedEmployee: Employee | null;
@@ -43,7 +49,7 @@ export function Rates({
     const fetchRates = () => {
       setError(null);
 
-      const effectiveDateStr = effectiveDate.toISOString().split("T")[0];
+      const effectiveDateStr = dateToISOString(effectiveDate);
 
       startTransition(async () => {
         try {
@@ -62,34 +68,6 @@ export function Rates({
 
     fetchRates();
   }, [selectedEmployee, effectiveDate]);
-
-  const formatCurrency = (cents: number) => {
-    return `$${(cents / 100).toFixed(2)}`;
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      month: "numeric",
-      day: "numeric",
-      year: "2-digit",
-    });
-  };
-
-  const formatRelativeTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return "just now";
-    if (diffMins < 60) return `${diffMins} min ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return formatDate(dateString);
-  };
 
   const handleEditClick = (rateItem: RateWithCategory) => {
     setEditingRate(rateItem);
@@ -320,9 +298,7 @@ export function Rates({
           onSuccess={handleEditSuccess}
           onRatesRefresh={() => {
             startTransition(async () => {
-              const effectiveDateStr = effectiveDate
-                .toISOString()
-                .split("T")[0];
+              const effectiveDateStr = dateToISOString(effectiveDate);
               const data = await getRatesForEmployee(
                 selectedEmployee.id,
                 effectiveDateStr,
@@ -340,9 +316,6 @@ export function Rates({
           historyRate={historyRate}
           employeeId={selectedEmployee.id}
           selectedEmployeeName={selectedEmployee.name}
-          formatCurrency={formatCurrency}
-          formatDate={formatDate}
-          formatRelativeTime={formatRelativeTime}
           onClose={handleCloseHistory}
         />
       )}

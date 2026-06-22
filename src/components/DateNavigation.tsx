@@ -1,5 +1,7 @@
 "use client";
 
+import { dateToISOString } from "@/lib/format";
+
 interface DateNavigationProps {
   effectiveDate: Date;
   onDateChange: (date: Date) => void;
@@ -51,7 +53,7 @@ export function DateNavigation({
 
       <input
         type="date"
-        value={effectiveDate.toISOString().split("T")[0]}
+        value={dateToISOString(effectiveDate)}
         onChange={handleDateInput}
         className="px-2 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
         aria-label="Effective date"

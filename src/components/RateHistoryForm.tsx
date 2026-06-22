@@ -2,14 +2,12 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { getRateHistory, type RateWithCategory } from "@/server/actions/rates";
+import { formatCurrency, formatDate, formatRelativeTime } from "@/lib/format";
 
 interface RateHistoryFormProps {
   historyRate: RateWithCategory;
   employeeId: number;
   selectedEmployeeName: string;
-  formatCurrency: (cents: number) => string;
-  formatDate: (dateString: string) => string;
-  formatRelativeTime: (dateString: string) => string;
   onClose: () => void;
 }
 
@@ -17,9 +15,6 @@ export function RateHistoryForm({
   historyRate,
   employeeId,
   selectedEmployeeName,
-  formatCurrency,
-  formatDate,
-  formatRelativeTime,
   onClose,
 }: RateHistoryFormProps) {
   const [historyData, setHistoryData] = useState<RateWithCategory["rate"][]>(
