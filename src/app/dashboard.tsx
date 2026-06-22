@@ -31,19 +31,18 @@ export function Dashboard({ employees }: DashboardProps) {
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
       <header className="sticky top-0 z-50 bg-white dark:bg-black border-b border-zinc-200 dark:border-zinc-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center h-16">
+          <div className="flex items-center justify-between h-16">
             <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
               Payslippers 🩴🩴
             </h1>
+            <EmployeeSelector
+              employees={employees}
+              selectedEmployee={selectedEmployee}
+              onEmployeeChange={setSelectedEmployee}
+            />
           </div>
         </div>
       </header>
-
-      <EmployeeSelector
-        employees={employees}
-        selectedEmployee={selectedEmployee}
-        onEmployeeChange={setSelectedEmployee}
-      />
 
       <Rates
         selectedEmployee={selectedEmployee}
@@ -53,7 +52,9 @@ export function Dashboard({ employees }: DashboardProps) {
       />
 
       <Payslips
+        employees={employees}
         selectedEmployee={selectedEmployee}
+        onEmployeeChange={setSelectedEmployee}
         refreshKey={payslipRefreshKey}
       />
     </div>

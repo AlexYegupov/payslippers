@@ -281,6 +281,19 @@ npx vitest
 - **Date formatting library** — Use `date-fns` or similar for human-readable date formatting instead of the hand-rolled `formatRelativeTime`.
 - **Employee/Category management UI** — Currently seeded only; add CRUD UI if needed.
 - **Deduplicated CSS** — Consolidate duplicate Tailwind classes into reusable component styles.
+- **Harmonize mobile / desktop / tablet layouts** — The current UI is built primarily for desktop. To provide a consistent experience across all breakpoints:
+  - **Responsive payslip list** — On desktop the payslip table shows all columns (employee, date, original total, current total, retroactive status, actions). On tablet, collapse less-critical columns into an expandable detail row. On mobile, switch to a card-based layout where each payslip is a tappable card showing key info at a glance, with a detail view on tap.
+  - **Responsive rate editor** — The rate editing form should use a stacked layout on mobile (label above input, full-width fields) and a horizontal inline layout on desktop. Consider a bottom-sheet or modal pattern on mobile instead of inline editing to save space.
+  - **Sticky date picker** — The effective date control is already sticky, but on mobile it should collapse into a compact button that opens a full-screen date picker, rather than taking up a wide horizontal bar.
+  - **Touch-friendly targets** — Ensure all interactive elements (buttons, dismiss actions, row selections) meet minimum 44×44 px touch targets on mobile. Retroactive change indicators and dismiss buttons are currently small and hard to tap on touch devices.
+  - **Consistent navigation** — On mobile, consider a bottom tab bar or hamburger menu for switching between the rates view and payslips view, instead of relying on the desktop-style layout.
+  - **Typography & spacing scale** — Use Tailwind's responsive text and spacing utilities (`sm:`, `md:`, `lg:`) to ensure comfortable reading and tapping on all screen sizes rather than fixed pixel values.
+  - **Horizontal scroll avoidance** — Tables and forms currently overflow horizontally on narrow screens. Either make them scroll with visible scroll indicators, or (preferably) restructure the layout so no horizontal scrolling is needed on any device.
+- **Unify grid & dialog patterns** — The current UI uses ad-hoc layouts for tables, forms, and modals. Establish a consistent design system:
+  - **Grid system** — Define a shared set of column templates and spacing tokens (e.g. 12-column grid with consistent gutters) so that the rates table, payslip list, and forms all align to the same underlying grid. This eliminates the current visual misalignment between sections.
+  - **Dialog / modal consistency** — Standardize dialog sizing, padding, and button placement across all modals (create rate, create payslip, dismiss confirmation). Use a single reusable `<Dialog>` component with consistent animation, backdrop, and escape-key behavior rather than one-off implementations.
+  - **Form layout unification** — All forms (rate editor, payslip creator) should share the same label placement, input sizing, error message positioning, and submit/cancel button order.
+  - **Empty & loading states** — Provide uniform skeleton loaders and empty-state illustrations across all data tables instead of showing raw "no data" text or inconsistent spinners.
 
 ### Code Quality
 

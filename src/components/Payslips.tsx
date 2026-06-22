@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { type Employee } from "./EmployeeSelector";
+import { EmployeeSelector, type Employee } from "./EmployeeSelector";
 import {
   getPayslipsForEmployee,
   getPayslipDetail,
@@ -13,7 +13,9 @@ import {
 import { getPaymentCategories } from "@/server/actions/rates";
 
 interface PayslipsProps {
+  employees: Employee[];
   selectedEmployee: Employee | null;
+  onEmployeeChange: (employee: Employee | null) => void;
   refreshKey?: number;
 }
 
@@ -36,7 +38,12 @@ function getTodayString() {
   return `${year}-${month}-${day}`;
 }
 
-export function Payslips({ selectedEmployee, refreshKey = 0 }: PayslipsProps) {
+export function Payslips({
+  employees,
+  selectedEmployee,
+  onEmployeeChange,
+  refreshKey = 0,
+}: PayslipsProps) {
   const [payslips, setPayslips] = useState<PayslipWithDetails[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -150,6 +157,28 @@ export function Payslips({ selectedEmployee, refreshKey = 0 }: PayslipsProps) {
     setSelectedPayslip(null);
     setPayslipDetailError(null);
   };
+
+  useEffect(() => {
+    if (!selectedPayslip) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleClosePayslipDetail();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedPayslip]);
+
+  useEffect(() => {
+    if (!isCreating) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleCloseCreate();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isCreating]);
 
   const handleDismissRateEdit = async (
     payslipId: number,
@@ -273,10 +302,19 @@ export function Payslips({ selectedEmployee, refreshKey = 0 }: PayslipsProps) {
   if (!selectedEmployee) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-8">
-          <p className="text-zinc-600 dark:text-zinc-400 text-center">
-            Please select an employee to view their payslips
-          </p>
+        <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+          <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800">
+            <EmployeeSelector
+              employees={employees}
+              selectedEmployee={selectedEmployee}
+              onEmployeeChange={onEmployeeChange}
+            />
+          </div>
+          <div className="p-8">
+            <p className="text-zinc-600 dark:text-zinc-400 text-center">
+              Please select an employee to view their payslips
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -316,14 +354,9 @@ export function Payslips({ selectedEmployee, refreshKey = 0 }: PayslipsProps) {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
         <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-              Payslips
-            </h2>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-              Historical payslips for {selectedEmployee.name}
-            </p>
-          </div>
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+            Payslips
+          </h2>
           <button
             onClick={handleOpenCreate}
             className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors text-sm"
@@ -383,10 +416,11 @@ export function Payslips({ selectedEmployee, refreshKey = 0 }: PayslipsProps) {
                 {payslips.map((payslip) => (
                   <tr
                     key={payslip.id}
-                    className={`hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors ${
+                    onClick={() => handleViewClick(payslip)}
+                    className={`cursor-pointer transition-colors ${
                       payslip.isRetroactivelyChanged
-                        ? "bg-amber-50 dark:bg-amber-900/20"
-                        : ""
+                        ? "bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                        : "hover:bg-zinc-50 dark:hover:bg-zinc-800"
                     }`}
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -461,8 +495,14 @@ export function Payslips({ selectedEmployee, refreshKey = 0 }: PayslipsProps) {
 
       {/* Payslip Detail Drawer */}
       {selectedPayslip && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl max-w-3xl w-full border border-zinc-200 dark:border-zinc-800 max-h-[80vh] flex flex-col">
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={handleClosePayslipDetail}
+        >
+          <div
+            className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl max-w-3xl w-full border border-zinc-200 dark:border-zinc-800 max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
@@ -672,8 +712,14 @@ export function Payslips({ selectedEmployee, refreshKey = 0 }: PayslipsProps) {
 
       {/* Create Payslip Modal */}
       {isCreating && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl max-w-lg w-full border border-zinc-200 dark:border-zinc-800 max-h-[80vh] flex flex-col">
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={handleCloseCreate}
+        >
+          <div
+            className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl max-w-lg w-full border border-zinc-200 dark:border-zinc-800 max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
               <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
                 Create Payslip
