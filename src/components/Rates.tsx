@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { type Employee } from "./EmployeeSelector";
+import { DateNavigation } from "./DateNavigation";
 import {
   getRatesForEmployee,
   createRateEdit,
@@ -12,12 +13,14 @@ import {
 interface RatesProps {
   selectedEmployee: Employee | null;
   effectiveDate: Date;
+  onDateChange: (date: Date) => void;
   onRatesChange?: () => void;
 }
 
 export function Rates({
   selectedEmployee,
   effectiveDate,
+  onDateChange,
   onRatesChange,
 }: RatesProps) {
   const [rates, setRates] = useState<RateWithCategory[]>([]);
@@ -268,9 +271,36 @@ export function Rates({
 
       <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
         <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            Rates
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+              Rates
+            </h2>
+            <DateNavigation
+              effectiveDate={effectiveDate}
+              onDateChange={onDateChange}
+            />
+          </div>
+          {(() => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const selected = new Date(effectiveDate);
+            selected.setHours(0, 0, 0, 0);
+            if (selected > today) {
+              return (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  Future date selected. New rate edits will start in the future.
+                </p>
+              );
+            }
+            if (selected < today) {
+              return (
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                  Past date selected. Viewing rates as they were on this date.
+                </p>
+              );
+            }
+            return null;
+          })()}
         </div>
 
         {rates.length === 0 ? (

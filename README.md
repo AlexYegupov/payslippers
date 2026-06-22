@@ -8,12 +8,52 @@ Built with **Next.js 16**, **TypeScript**, **Drizzle ORM**, **better-sqlite3**, 
 
 ## Table of Contents
 
+- [Getting Started](#getting-started)
 - [Description](#description)
 - [Database Schema](#database-schema)
 - [Design Choices](#design-choices)
-- [Getting Started](#getting-started)
 - [Running Tests](#running-tests)
 - [What I Would Change With More Time](#what-i-would-change-with-more-time)
+
+---
+
+## Quick start
+
+### Prerequisites
+
+- **Node.js** 20+ (tested on v26.3.1 stable release)
+- **npm** (or yarn/pnpm/bun)
+
+### Installation
+
+```bash
+npm install
+cp .env.example .env
+npm run db:recreate
+```
+
+### Running the App
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+
+
+
+### Other Database Commands
+
+| Command | Description |
+|---|---|
+| `npm run db:setup` | Create schema from `initial.sql` and seed (safe to re-run) |
+| `npm run db:recreate` | Delete `local.db`, then run `db:setup` |
+| `npm run db:seed` | Insert seed data only (idempotent — skips if already seeded) |
+| `npm run db:reset` | Delete all data, keep schema |
+| `npm run db:push` | Push Drizzle schema to the database |
+| `npm run db:console` | Open SQLite CLI on `local.db` |
+| `npm run db:studio` | Open Drizzle Studio (visual DB browser) |
 
 ---
 
@@ -170,60 +210,6 @@ All monetary values are stored as integers in cents (`rate_amount_cents`, `total
 
 ---
 
-## Getting Started
-
-### Prerequisites
-
-- **Node.js** 20+
-- **npm** (or yarn/pnpm/bun)
-
-### Installation
-
-```bash
-npm install
-```
-
-### Environment
-
-The app reads `DATABASE_URL` from your environment (via `.env`). It defaults to `file:local.db` if not set. To use the default, no `.env` file is needed .
-
-To use a custom path, create & fill the `.env`:
-
-```bash
-DATABASE_URL=file:local.db
-```
-
-### Database Setup
-
-The app uses a local SQLite database (`local.db`). To create the database with seed initial data use:
-
-
-```bash
-npm run db:recreate
-```
-
-### Running the App
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-### Other Database Commands
-
-| Command | Description |
-|---|---|
-| `npm run db:setup` | Create schema from `initial.sql` and seed (safe to re-run) |
-| `npm run db:recreate` | Delete `local.db`, then run `db:setup` |
-| `npm run db:seed` | Insert seed data only (idempotent — skips if already seeded) |
-| `npm run db:reset` | Delete all data, keep schema |
-| `npm run db:push` | Push Drizzle schema to the database |
-| `npm run db:console` | Open SQLite CLI on `local.db` |
-| `npm run db:studio` | Open Drizzle Studio (visual DB browser) |
-
----
-
 ## Running Tests
 
 Tests are written with **Vitest** and cover the core server actions (`rates.ts` and `payslips.ts`). They require a seeded database.
@@ -276,6 +262,7 @@ npx vitest
 
 ### Performance
 
+- **Client-side data caching** — Add React Query (or a similar library) for proper local caching, deduplication of requests, background refetching, and optimistic updates. This would eliminate redundant network calls when navigating between pages and make the UI feel significantly more responsive.
 - **Targeted payslip refresh** — After modifying a rate, only recompute totals for affected payslips instead of all of them.
 - **Smarter retroactive link table** — Populate `rate_event_payslips` with only the events that actually change the rate (not all post-creation events), simplifying the read path and avoiding incorrect filtering.
 - **Stricter link validation** — When creating the `rate_event_payslips` link, check both `effective_at` and `payment_category_id` to ensure the event truly affects the payslip.

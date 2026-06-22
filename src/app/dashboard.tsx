@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { DateNavigation } from "@/components/DateNavigation";
 import { EmployeeSelector, type Employee } from "@/components/EmployeeSelector";
 import { Payslips } from "@/components/Payslips";
 import { Rates } from "@/components/Rates";
@@ -30,11 +29,6 @@ export function Dashboard({ employees }: DashboardProps) {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
-      <DateNavigation
-        effectiveDate={effectiveDate}
-        onDateChange={setEffectiveDate}
-      />
-
       <EmployeeSelector
         employees={employees}
         selectedEmployee={selectedEmployee}
@@ -44,6 +38,7 @@ export function Dashboard({ employees }: DashboardProps) {
       <Rates
         selectedEmployee={selectedEmployee}
         effectiveDate={effectiveDate}
+        onDateChange={setEffectiveDate}
         onRatesChange={handleRatesChange}
       />
 
