@@ -294,6 +294,18 @@ npx vitest
   - **Dialog / modal consistency** — Standardize dialog sizing, padding, and button placement across all modals (create rate, create payslip, dismiss confirmation). Use a single reusable `<Dialog>` component with consistent animation, backdrop, and escape-key behavior rather than one-off implementations.
   - **Form layout unification** — All forms (rate editor, payslip creator) should share the same label placement, input sizing, error message positioning, and submit/cancel button order.
   - **Empty & loading states** — Provide uniform skeleton loaders and empty-state illustrations across all data tables instead of showing raw "no data" text or inconsistent spinners.
+- **Keyboard-friendly navigation** — The current UI relies heavily on mouse/touch interaction. Improve accessibility and power-user efficiency by ensuring all interactive elements are fully keyboard-operable:
+  - **Focus management** — Visible focus rings on all inputs, buttons, and rows; logical tab order through forms and tables; focus trapped inside modals when open and restored on close.
+  - **Keyboard shortcuts** — Add common shortcuts (e.g. `/` to search, `Esc` to close dialogs, `Enter` to submit forms, arrow keys to navigate table rows) with a help overlay (e.g. `?` key) listing available shortcuts.
+  - **Skip links & landmarks** — Add skip-to-content links and proper ARIA landmarks (`<main>`, `<nav>`, `<dialog>`) so screen-reader and keyboard users can jump between sections quickly.
+  - **Accessible dialogs** — Ensure all modals have `role="dialog"`, `aria-modal`, descriptive `aria-labelledby`/`aria-describedby`, and proper focus trapping rather than relying solely on visual overlay.
+- **Internationalization (i18n)** — The app currently has all UI strings hardcoded in English. Prepare it for a global payroll context:
+  - **Extract all strings** — Move every user-facing string (labels, buttons, error messages, empty states, toasts) into a centralized i18n message catalog (e.g. `next-intl` or `react-i18next`).
+  - **Locale-aware formatting** — Use `Intl.DateTimeFormat`, `Intl.NumberFormat`, and `Intl.RelativeTimeFormat` for dates, currencies, and relative times instead of hand-rolled formatters, so they adapt automatically to the user's locale.
+  - **Date input handling** — Accept and display dates in the user's local format (DD/MM/YYYY vs. MM/DD/YYYY vs. YYYY-MM-DD) while keeping ISO-8601 internally.
+  - **Currency & number formatting** — Format monetary values with the correct decimal separator, thousands separator, and currency symbol per locale (e.g. `€1.234,56` in de-DE vs. `$1,234.56` in en-US).
+  - **RTL support** — Ensure the layout mirrors correctly for right-to-left languages (Arabic, Hebrew) by using logical CSS properties (`inline-start`, `inline-end`) and testing with `dir="rtl"`.
+  - **Pluralization** — Use ICU MessageFormat plural rules for strings like "{count} payslip(s)" so they work across languages with complex plural forms.
 
 ### Code Quality
 

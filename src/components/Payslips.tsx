@@ -426,6 +426,10 @@ export function Payslips({
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
                         {payslip.employeeName}
+                        {}
+                        <span className="text-zinc-400 dark:text-zinc-500 font-normal">
+                          (id={payslip.id})
+                        </span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
