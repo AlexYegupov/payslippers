@@ -268,6 +268,12 @@ npx vitest
 - **Smarter retroactive link table** — Populate `rate_event_payslips` with only the events that actually change the rate (not all post-creation events), simplifying the read path and avoiding incorrect filtering.
 - **Stricter link validation** — When creating the `rate_event_payslips` link, check both `effective_at` and `payment_category_id` to ensure the event truly affects the payslip.
 - **Avoid redundant retroactive edits** — Don't create retroactive changes that would be immediately overridden by another retroactive edit closer to the payslip date.
+- **SQL-level computation instead of server-side JS** — Several calculations currently performed in server-side JavaScript (e.g. resolving effective rates, computing payslip totals, determining retroactive adjustments) could be pushed down into SQL queries or database views. For example:
+  - **Effective rate resolution** — Instead of fetching all `rate_events` and filtering/sorting in JS to find the effective rate for a given date, use a SQL `DISTINCT ON` or window function (`ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...)`) to let the database return only the latest applicable rate per employee/category.
+  - **Payslip total aggregation** — Instead of fetching all payslip lines and summing in JS, use a `SUM()` with `GROUP BY` in a SQL query or a materialized view that maintains `current_total` per payslip.
+  - **Retroactive change detection** — Instead of comparing old and new totals in application code, use a SQL `LATERAL` join or CTE to compute the delta between the previous and new rate for each affected payslip in a single query.
+  - **Database views for common reads** — Create views like `v_payslip_current_state` or `v_effective_rates` that encapsulate the heavy join/filter logic, so the application layer only needs simple `SELECT * FROM v_...` queries.
+  - This approach reduces data transfer between the DB and application, leverages the query planner for optimization, and keeps business logic testable via SQL-level tests.
 
 ### Security
 
