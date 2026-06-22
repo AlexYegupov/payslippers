@@ -263,6 +263,7 @@ npx vitest
 ### Performance
 
 - **Client-side data caching** — Add React Query (or a similar library) for proper local caching, deduplication of requests, background refetching, and optimistic updates. This would eliminate redundant network calls when navigating between pages and make the UI feel significantly more responsive.
+- **Client-side rate caching** — Instead of refetching rates from the server on every `effectiveDate` change, load all `rate_events` for an employee once and compute the effective rates locally as a pure function of `(allEvents, effectiveDate)`. This would make date navigation instant (no network call at all) and completely eliminate the visual flicker that currently happens when switching dates. React Query's `stale-while-revalidate` pattern fits well here: cache all events by `employeeId`, recompute rates in a `useMemo`, and invalidate only when a new rate edit is created or the employee changes.
 - **Targeted payslip refresh** — After modifying a rate, only recompute totals for affected payslips instead of all of them.
 - **Smarter retroactive link table** — Populate `rate_event_payslips` with only the events that actually change the rate (not all post-creation events), simplifying the read path and avoiding incorrect filtering.
 - **Stricter link validation** — When creating the `rate_event_payslips` link, check both `effective_at` and `payment_category_id` to ensure the event truly affects the payslip.

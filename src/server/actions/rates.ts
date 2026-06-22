@@ -2,7 +2,7 @@
 
 import { db, sqlite } from "@/server/db";
 import * as schema from "@/server/db/schema";
-import { eq, and, desc, gte } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { createRateEditSchema } from "@/server/db/schema";
 
@@ -41,38 +41,61 @@ export async function getRatesForEmployee(
     // Get all payment categories
     const categories = await db.select().from(schema.paymentCategories);
 
-    // Get the most recent rate edit for each category as of the effective date
-    const rates = await Promise.all(
-      categories.map(async (category) => {
-        // Get all rate edits for this employee and category
-        const allRateEdits = await db
-          .select()
-          .from(schema.rateEdits)
-          .where(
-            and(
-              eq(schema.rateEdits.employeeId, employeeId),
-              eq(schema.rateEdits.paymentCategoryId, category.id),
-            ),
-          )
-          .orderBy(
-            desc(schema.rateEdits.effectiveDate),
-            desc(schema.rateEdits.createdAt),
-            desc(schema.rateEdits.id),
-          );
+    // Single query: get the most recent rate edit per category as of the effective date
+    // Uses ROW_NUMBER() to rank edits per category, then filters to #1
+    const activeRates = sqlite
+      .prepare(
+        `
+        WITH ranked AS (
+          SELECT
+            *,
+            ROW_NUMBER() OVER (
+              PARTITION BY payment_category_id
+              ORDER BY effective_at DESC, created_at DESC, id DESC
+            ) AS rn
+          FROM rate_events
+          WHERE employee_id = ?
+            AND effective_at <= ?
+        )
+        SELECT * FROM ranked WHERE rn = 1
+        `,
+      )
+      .all(employeeId, effectiveDate) as Array<{
+      id: number;
+      employee_id: number;
+      payment_category_id: number;
+      effective_at: string;
+      rate_amount_cents: number;
+      created_at: string;
+      created_by_user_id: number;
+      note: string | null;
+    }>;
 
-        // Find the most recent rate edit that is effective as of the selected date
-        const activeRate = allRateEdits.find(
-          (rate) => rate.effectiveDate <= effectiveDate,
-        );
+    // Build a lookup: categoryId -> rate edit
+    const rateByCategory = new Map<number, (typeof activeRates)[number]>();
+    for (const row of activeRates) {
+      rateByCategory.set(row.payment_category_id, row);
+    }
 
-        return {
-          category,
-          rate: activeRate || null,
-        };
-      }),
-    );
-
-    return rates;
+    // Map categories to their active rates
+    return categories.map((category) => {
+      const rate = rateByCategory.get(category.id);
+      return {
+        category,
+        rate: rate
+          ? {
+              id: rate.id,
+              employeeId: rate.employee_id,
+              paymentCategoryId: rate.payment_category_id,
+              effectiveDate: rate.effective_at,
+              rateCents: rate.rate_amount_cents,
+              createdAt: rate.created_at,
+              createdByUserId: rate.created_by_user_id,
+              note: rate.note,
+            }
+          : null,
+      };
+    });
   } catch (error) {
     console.error("Error fetching rates:", error);
     throw new Error("Failed to fetch rates");

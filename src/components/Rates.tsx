@@ -24,7 +24,6 @@ export function Rates({
   onRatesChange,
 }: RatesProps) {
   const [rates, setRates] = useState<RateWithCategory[]>([]);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -54,7 +53,6 @@ export function Rates({
     }
 
     const fetchRates = () => {
-      setLoading(true);
       setError(null);
 
       const effectiveDateStr = effectiveDate.toISOString().split("T")[0];
@@ -70,8 +68,6 @@ export function Rates({
           setError(
             err instanceof Error ? err.message : "Failed to fetch rates",
           );
-        } finally {
-          setLoading(false);
         }
       });
     };
@@ -215,26 +211,6 @@ export function Rates({
     );
   }
 
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-8">
-          <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-1/4"></div>
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-12 bg-zinc-200 dark:bg-zinc-800 rounded"
-                ></div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (error) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -269,7 +245,12 @@ export function Rates({
         </div>
       )}
 
-      <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+      <div className="relative bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+        {isPending && (
+          <div className="absolute top-3 right-3 z-10">
+            <div className="w-4 h-4 border-2 border-zinc-300 dark:border-zinc-600 border-t-blue-500 rounded-full animate-spin" />
+          </div>
+        )}
         <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
